@@ -5,7 +5,10 @@ import pandas as pd
 import os
 from src.kinematics import computar_angulos_completos_2d
 
-mp_pose = mp.solutions.pose
+try:
+    import mediapipe.python.solutions.pose as mp_pose
+except AttributeError:
+    from mediapipe.solutions import pose as mp_pose
 
 def procesar_video(video_path: str, output_parquet_path: str = None, session_id: str = "SES-001", worker_id: str = "OPERARIO"):
     cap = cv2.VideoCapture(video_path)

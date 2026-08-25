@@ -1,14 +1,19 @@
+import os
 import cv2
-import mediapipe as mp
 import numpy as np
 import pandas as pd
-import os
-from src.kinematics import computar_angulos_completos_2d
+import mediapipe as mp
 
+# Carga robusta de MediaPipe Pose para entornos de servidor
 try:
-    import mediapipe.python.solutions.pose as mp_pose
-except AttributeError:
-    from mediapipe.solutions import pose as mp_pose
+    from mediapipe.python.solutions import pose as mp_pose
+except (AttributeError, ImportError, ModuleNotFoundError):
+    try:
+        from mediapipe.solutions import pose as mp_pose
+    except Exception:
+        import mediapipe.solutions.pose as mp_pose
+
+from src.kinematics import computar_angulos_completos_2d
 
 def procesar_video(video_path: str, output_parquet_path: str = None, session_id: str = "SES-001", worker_id: str = "OPERARIO"):
     cap = cv2.VideoCapture(video_path)
@@ -53,7 +58,7 @@ def procesar_video(video_path: str, output_parquet_path: str = None, session_id:
             dir_frente = 1.0 if (nose[0] - c7[0]) >= 0 else -1.0
             len_torso = np.linalg.norm(c7 - raw_hip)
             
-            # Cadera anclada firmemente al asiento
+            # Cadera anclada al plano del asiento
             hip_x = raw_hip[0] - (len_torso * 0.05 * dir_frente)
             hip_y = raw_hip[1] + (len_torso * 0.28)
             r_hip = np.array([hip_x, hip_y])
@@ -65,11 +70,11 @@ def procesar_video(video_path: str, output_parquet_path: str = None, session_id:
             es_ocluido = 0
             estado_postura = "DESCONOCIDO"
             
-            # Filtro: Si el tobillo crudo está más adelante que las manos o muy arriba, es una alucinación óptica (el escritorio).
+            # Filtro de alucinación óptica por escritorio
             es_alucinacion = False
             if dir_frente == 1.0 and raw_ank[0] > r_wri[0]: es_alucinacion = True
             if dir_frente == -1.0 and raw_ank[0] < r_wri[0]: es_alucinacion = True
-            if raw_ank[1] < r_hip[1]: es_alucinacion = True # Tobillo por encima de la cadera
+            if raw_ank[1] < r_hip[1]: es_alucinacion = True
             
             if vis_ank < 0.35 or es_alucinacion:
                 es_ocluido = 1
@@ -86,14 +91,12 @@ def procesar_video(video_path: str, output_parquet_path: str = None, session_id:
                     estado_postura = "APOYO PLANTAR (GROUNDING)"
             
             # --- TRAZADO BIOMECÁNICO (INVERSE KINEMATICS) ---
-            # Si hay oclusión o postura irregular, borramos las líneas para no manchar el reporte
             if es_ocluido == 1 or estado_postura != "APOYO PLANTAR (GROUNDING)":
                 r_knee = np.array([0.0, 0.0])
                 r_ank = np.array([0.0, 0.0])
                 r_toe = np.array([0.0, 0.0])
                 arod = 0.0
             else:
-                # Si hay apoyo plantar confiable, dibujamos la pierna perfecta geométricamente
                 len_femur = max(45.0, len_torso * 0.75)
                 knee_x = hip_x + (len_femur * dir_frente)
                 knee_y = hip_y + (len_femur * 0.05)

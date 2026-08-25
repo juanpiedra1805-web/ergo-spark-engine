@@ -1,0 +1,26 @@
+{
+  "metodo": "REBA",
+  "normativa": "Hignett & McAtamney (2000) / UNE-EN 1005-4 / ISO 11226",
+  "ambito_aplicacion": "Puestos industriales, empaque, manufactura y tareas con cambios posturales",
+  "parametros_puesto": {
+    "carga_fuerza": {
+      "peso_carga_kg": 4.5,
+      "categoria_peso": "< 5 kg (Puntaje 0)",
+      "fuerza_aplicada_bruscamente": false
+    },
+    "calidad_agarre": {
+      "tipo_agarre": "regular",
+      "puntuacion_agarre": 1,
+      "descripcion": "Contenedor sin asas óptimas o agarre con dedos en flexión 90°"
+    },
+    "actividad_muscular": {
+      "postura_estatica_mas_1_minuto": true,
+      "movimientos_repetitivos_mas_4_veces_minuto": true,
+      "cambios_posturales_bruscos_o_inestables": false
+    },
+    "condiciones_apoyo": {
+      "apoyo_brazos_presente": false,
+      "postura_a_favor_de_gravedad": false
+    }
+  }
+}

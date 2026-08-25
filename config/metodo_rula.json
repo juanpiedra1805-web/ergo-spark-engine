@@ -1,0 +1,22 @@
+{
+  "metodo": "RULA",
+  "normativa": "McAtamney & Corlett (1993) / ISO 11226",
+  "ambito_aplicacion": "Líneas de montaje, inspección, operarios de control y miembros superiores",
+  "parametros_puesto": {
+    "carga_fuerza": {
+      "peso_carga_kg": 1.5,
+      "tipo_solicitacion": "intermitente",
+      "puntuacion_carga": 0
+    },
+    "actividad_muscular": {
+      "actividad_estatica_mas_1_minuto": true,
+      "actividad_repetitiva_mas_4_veces_minuto": true
+    },
+    "modificadores_segmentos": {
+      "antebrazo_cruza_linea_media": false,
+      "antebrazo_trabaja_a_un_lado": true,
+      "giro_muneca_pronacion_supinacion": "media",
+      "puntos_apoyo_antebrazo": false
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "metodo": "ROSA",
+  "normativa": "Sonne et al. (2012) / ISO 9241-5 / ISO 11226",
+  "ambito_aplicacion": "Puestos de trabajo en oficinas y pantallas de visualización de datos (PVD)",
+  "parametros_puesto": {
+    "silla": {
+      "altura_asiento_regulable": false,
+      "espacio_suficiente_piernas_bajo_mesa": true,
+      "profundidad_asiento_regulable": false,
+      "holgura_poplitea_adecuada_8cm": true,
+      "reposabrazos_presentes": false,
+      "reposabrazos_ajustables": false,
+      "reposabrazos_superficie_blanda": false,
+      "respaldo_reclinable_95_110": false,
+      "soporte_lumbar_ajustable": false,
+      "tiempo_uso_diario_horas": 6
+    },
+    "pantalla": {
+      "tipo_pantalla": "laptop_integrada",
+      "distancia_pantalla_ojos_cm": 45,
+      "borde_superior_a_nivel_ojos": false,
+      "pantalla_muy_baja_30_grados": true,
+      "pantalla_desviada_lateralmente": false,
+      "brillos_o_reflejos_presentes": false,
+      "uso_atril_documentos": false,
+      "tiempo_uso_diario_horas": 6
+    },
+    "mouse": {
+      "alineado_con_hombro": true,
+      "mouse_pequeno_agarre_pinza": false,
+      "mouse_teclado_diferente_altura": false,
+      "reposamunecas_mouse_presente": false,
+      "tiempo_uso_diario_horas": 5
+    },
+    "teclado": {
+      "teclado_independiente": true,
+      "teclado_ajustable_en_inclinacion": false,
+      "teclado_demasiado_alto": false,
+      "munecas_apoyadas_en_borde_duro": true,
+      "tiempo_uso_diario_horas": 5
+    },
+    "telefono": {
+      "uso_auriculares_manos_libres": true,
+      "sujecion_entre_cuello_y_hombro": false,
+      "telefono_distancia_menor_30cm": true,
+      "tiempo_uso_diario_horas": 1
+    }
+  }
+}

@@ -2,22 +2,67 @@ import os
 import cv2
 import numpy as np
 import pandas as pd
-import mediapipe as mp
-# ❌ Línea original:
-# mp_pose = mp.solutions.pose
 
-# ✅ Importación resiliente:
+# Importación robusta de MediaPipe (compatible con todas las versiones de Linux/Streamlit Cloud)
 try:
     import mediapipe as mp
+    import mediapipe.python.solutions.pose as mp_pose
+    import mediapipe.python.solutions.drawing_utils as mp_drawing
+except (ImportError, AttributeError):
     try:
-        mp_pose = mp.solutions.pose
-        mp_drawing = mp.solutions.drawing_utils
-    except AttributeError:
         from mediapipe.python.solutions import pose as mp_pose
         from mediapipe.python.solutions import drawing_utils as mp_drawing
-except Exception:
-    import mediapipe as mp
-    mp_pose = getattr(mp, "solutions", None)
+    except (ImportError, AttributeError):
+        import mediapipe as mp
+        mp_pose = mp.solutions.pose
+        mp_drawing = mp.solutions.drawing_utils
+
+def calcular_angulo_2d(p1, p2, p3):
+    """Calcula el ángulo en grados formado por 3 puntos 2D en el vértice p2."""
+    v1 = np.array(p1) - np.array(p2)
+    v2 = np.array(p3) - np.array(p2)
+    n1 = np.linalg.norm(v1)
+    n2 = np.linalg.norm(v2)
+    if n1 == 0 or n2 == 0:
+        return 0.0
+    cos_ang = np.dot(v1, v2) / (n1 * n2)
+    return float(np.degrees(np.arccos(np.clip(cos_ang, -1.0, 1.0))))
+
+def computar_angulos_completos_2d(c7, r_ear, nose, r_hip, r_sh, r_elb, r_wri, r_ind, r_knee, r_ank):
+    """Calcula los 5 ángulos posturales principales del puesto de trabajo."""
+    # 1. Tronco: C7 a Cadera respecto a la vertical
+    v_torso = np.array(c7) - np.array(r_hip)
+    v_vert = np.array([0.0, -1.0])
+    n_torso = np.linalg.norm(v_torso)
+    if n_torso > 0:
+        cos_t = np.dot(v_torso, v_vert) / n_torso
+        ang_tronco = float(np.degrees(np.arccos(np.clip(cos_t, -1.0, 1.0))))
+    else:
+        ang_tronco = 0.0
+        
+    # 2. Cuello: C7 a Nariz respecto a la vertical
+    v_cuello = np.array(nose) - np.array(c7)
+    n_cuello = np.linalg.norm(v_cuello)
+    if n_cuello > 0:
+        cos_c = np.dot(v_cuello, v_vert) / n_cuello
+        ang_cuello = float(np.degrees(np.arccos(np.clip(cos_c, -1.0, 1.0))))
+    else:
+        ang_cuello = 0.0
+        
+    # 3. Brazo: Hombro-Codo respecto a la línea del torso
+    ang_brazo = float(calcular_angulo_2d(r_hip, r_sh, r_elb))
+    
+    # 4. Muñeca: Codo-Muñeca-Índice
+    ang_muneca = float(calcular_angulo_2d(r_elb, r_wri, r_ind))
+    
+    # 5. Rodilla: Cadera-Rodilla-Tobillo
+    if np.all(r_knee == 0.0) or np.all(r_ank == 0.0):
+        ang_rodilla = 0.0
+    else:
+        ang_rodilla = float(calcular_angulo_2d(r_hip, r_knee, r_ank))
+        
+    return ang_tronco, ang_cuello, ang_brazo, ang_muneca, ang_rodilla
+
 def procesar_video(video_path: str, output_parquet_path: str = None, session_id: str = "SES-001", worker_id: str = "OPERARIO"):
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
@@ -95,7 +140,7 @@ def procesar_video(video_path: str, output_parquet_path: str = None, session_id:
                 else:
                     estado_postura = "APOYO PLANTAR (GROUNDING)"
             
-            # --- TRAZADO BIOMECÁNICO (INVERSE KINEMATICS) ---
+            # --- TRAZADO BIOMECÁNICO ---
             if es_ocluido == 1 or estado_postura != "APOYO PLANTAR (GROUNDING)":
                 r_knee = np.array([0.0, 0.0])
                 r_ank = np.array([0.0, 0.0])

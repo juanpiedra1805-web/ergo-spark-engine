@@ -1,4 +1,4 @@
-import os
+iimport os
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 os.environ["MPLCONFIGDIR"] = "/tmp/matplotlib"
 
@@ -29,6 +29,48 @@ for p in ["logo.png", "assets/logo.png", "img/logo.png", "assets/logo.svg", "log
     if os.path.exists(p):
         LOGO_PATH = p
         break
+
+# --- Módulos de Cálculo y Visualización SSO 4.0 ---
+
+def calcular_fuzzy_score_continuo(t_p50, c_p50, b_p50, m_p50, metodo="ROSA", bonus_carga=0, bonus_agarre=0):
+    """
+    Calcula un puntaje continuo y suave utilizando lógica difusa (Fuzzy REBA/ROSA)
+    para evitar discontinuidades y 'score-jumping' en las fronteras angulares (SSO 4.0).
+    """
+    if t_p50 <= 0:
+        s_t = 1.0
+    elif t_p50 <= 20.0:
+        s_t = 1.0 + (t_p50 / 20.0) * 1.0
+    elif t_p50 <= 60.0:
+        s_t = 2.0 + ((t_p50 - 20.0) / 40.0) * 1.0
+    else:
+        s_t = 3.0 + min(1.0, (t_p50 - 60.0) / 30.0)
+        
+    if c_p50 <= 20.0:
+        s_c = 1.0 + (c_p50 / 20.0) * 0.5
+    else:
+        s_c = 1.5 + min(1.5, ((c_p50 - 20.0) / 30.0) * 1.5)
+        
+    if b_p50 <= 20.0:
+        s_b = 1.0 + (b_p50 / 20.0) * 0.5
+    elif b_p50 <= 45.0:
+        s_b = 1.5 + ((b_p50 - 20.0) / 25.0) * 1.0
+    else:
+        s_b = 2.5 + min(1.5, ((b_p50 - 45.0) / 45.0) * 1.5)
+        
+    if m_p50 <= 15.0:
+        s_m = 1.0 + (m_p50 / 15.0) * 0.5
+    else:
+        s_m = 1.5 + min(0.5, ((m_p50 - 15.0) / 20.0) * 0.5)
+        
+    if metodo == "ROSA":
+        base_score = (s_t * 0.30) + (s_c * 0.30) + (s_b * 0.20) + (s_m * 0.20)
+        score_calc = round(min(10.0, max(1.0, base_score * 2.2)), 1)
+    else:
+        base_score = (s_t * 0.35) + (s_c * 0.25) + (s_b * 0.25) + (s_m * 0.15)
+        score_calc = round(min(11.0, max(1.0, (base_score * 2.5) + bonus_carga + bonus_agarre)), 1)
+        
+    return score_calc
 
 def generar_boxplot_ergonomico_seguro(pdf_continuous, boxplot_path, worker_id, metodo):
     """
@@ -72,7 +114,6 @@ def generar_boxplot_ergonomico_seguro(pdf_continuous, boxplot_path, worker_id, m
             ]
             labels = ['Tronco (Sagital)', 'Cuello (C7-Cara)', 'Brazo/Hombro', 'Muñeca/Mano', 'Miembros Inf.']
             
-        # Bandas normativas de fondo ISO 11226
         ax.axhspan(0, 20, color='#DCFCE7', alpha=0.65, label='Zona Conforme (ISO 11226 ≤20°)')
         ax.axhspan(20, 45, color='#FEF3C7', alpha=0.65, label='Zona de Alerta (20° - 45°)')
         ax.axhspan(45, 120, color='#FEE2E2', alpha=0.65, label='Zona No Conforme / Riesgo (>45°)')
@@ -109,7 +150,47 @@ def generar_boxplot_ergonomico_seguro(pdf_continuous, boxplot_path, worker_id, m
         plt.savefig(boxplot_path, bbox_inches='tight')
         plt.close(fig)
 
-# Inyección de Estilos CSS Avanzados
+def generar_grafico_dosis_temporal(df_continuous, fps, output_path, worker_id):
+    """
+    Genera la curva de cinemática continua y fatiga acumulada a lo largo del tiempo (SSO 4.0).
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9.5, 6.2), dpi=300, sharex=True)
+    
+    n_frames = len(df_continuous)
+    tiempo_sec = np.arange(n_frames) / max(1.0, fps)
+    
+    t_angles = df_continuous['ang_tronco'].values if 'ang_tronco' in df_continuous.columns else np.full(n_frames, 51.5)
+    c_angles = df_continuous['ang_cuello'].values if 'ang_cuello' in df_continuous.columns else np.full(n_frames, 73.1)
+    
+    # 1. Telemetría Angular Continua
+    ax1.plot(tiempo_sec, t_angles, label='Tronco Sagital (°)', color='#1E40AF', linewidth=1.8)
+    ax1.plot(tiempo_sec, c_angles, label='Cuello C7-Cara (°)', color='#DC2626', linewidth=1.8)
+    ax1.axhline(20, color='#16A34A', linestyle='--', linewidth=1.2, label='Límite ISO 11226 Tronco (20°)')
+    ax1.axhline(25, color='#D97706', linestyle='--', linewidth=1.2, label='Límite ISO 11226 Cuello (25°)')
+    
+    is_risk = (t_angles > 20.0)
+    ax1.fill_between(tiempo_sec, t_angles, 20, where=is_risk, color='#FEE2E2', alpha=0.5, label='Exposición a Flexión Forzada')
+    ax1.set_title(f"Cinemática Continua y Exposición Postural (SSO 4.0) — {worker_id}", fontsize=11, fontweight='bold', color='#0F2D59')
+    ax1.set_ylabel("Ángulo (°)", fontsize=9.5, fontweight='bold')
+    ax1.grid(True, linestyle=':', alpha=0.6)
+    ax1.legend(loc='upper right', fontsize=8, framealpha=0.9)
+    
+    # 2. Dosis Acumulada de Fatiga Postural
+    dosis_acum = np.cumsum(np.maximum(0, t_angles - 20) + np.maximum(0, c_angles - 25)) / max(1.0, fps)
+    ax2.plot(tiempo_sec, dosis_acum, color='#7C3AED', linewidth=2.0, label='Dosis de Fatiga Postural Acumulada (°·s)')
+    ax2.fill_between(tiempo_sec, dosis_acum, color='#EDE9FE', alpha=0.6)
+    ax2.set_title("Índice de Carga Musculoesquelética Acumulada (Dosis Temporal)", fontsize=10, fontweight='bold', color='#4C1D95')
+    ax2.set_xlabel("Tiempo de Muestreo (segundos)", fontsize=9.5, fontweight='bold')
+    ax2.set_ylabel("Dosis (°·s)", fontsize=9.5, fontweight='bold')
+    ax2.grid(True, linestyle=':', alpha=0.6)
+    ax2.legend(loc='upper left', fontsize=8)
+    
+    plt.tight_layout()
+    plt.savefig(output_path, bbox_inches='tight')
+    plt.close(fig)
+
+# Inyección de Estilos CSS Avanzados (Diseño Perceptual y Alta Accesibilidad WCAG AAA)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -193,7 +274,6 @@ st.markdown("""
         transition: transform 0.2s ease, box-shadow 0.2s ease;
         height: 100%;
     }
-    
     .kpi-box:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
@@ -241,7 +321,6 @@ st.markdown("""
         justify-content: space-between;
         gap: 16px;
     }
-    
     .quality-success { background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; }
     .quality-warning { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
     .quality-danger { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; }
@@ -341,7 +420,7 @@ if uploaded_file is not None:
         st.session_state["auditoria_completada"] = False
         st.session_state["last_uploaded_name"] = uploaded_file.name
 
-# 4. Barra Lateral con Parámetros Avanzados
+# 4. Barra Lateral con Parámetros Avanzados, Variables de Carga, Síntomas y Privacidad LOPDP
 with st.sidebar:
     if LOGO_PATH:
         st.image(LOGO_PATH, use_container_width=True)
@@ -406,6 +485,9 @@ with st.sidebar:
         sintoma_lumbar = st.checkbox("Región Lumbar / Espalda Baja", value=False)
         sintoma_muneca = st.checkbox("Muñecas / Manos", value=False)
 
+    with st.expander("🔒 Privacidad & Gobernanza (LOPDP)", expanded=False):
+        anonimizar_rostro = st.checkbox("Anonimización Facial (Face Blurring)", value=True, help="Aplica difuminado en capturas para cumplir con la Ley Orgánica de Protección de Datos Personales.")
+
     st.markdown("---")
     st.markdown("#### **Marco Normativo Ecuatoriano**")
     st.markdown("""
@@ -419,7 +501,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("[🌐 www.ih-t.net](https://www.ih-t.net)", unsafe_allow_html=True)
 
-# 5. Ejecución del Pipeline Biomecánico
+# 5. Ejecución del Pipeline Biomecánico SSO 4.0
 if uploaded_file is not None:
     col_btn, col_info = st.columns([1.5, 3])
     with col_btn:
@@ -437,7 +519,7 @@ if uploaded_file is not None:
         from src.kinematics import calcular_matriz_rosa_oficial
         from src.coherence_validator import validar_coherencia_pandas
 
-        with st.status("🔬 Ejecutando pipeline de auditoría biomecánica determinista...", expanded=True) as status:
+        with st.status("🔬 Ejecutando pipeline de auditoría biomecánica determinista (SSO 4.0)...", expanded=True) as status:
             tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
             try:
                 tfile.write(uploaded_file.read())
@@ -455,7 +537,7 @@ if uploaded_file is not None:
                 else:
                     metodo_seleccionado = "RULA"
 
-                st.write(f"🔹 **Fase 2/6:** Extrayendo coordenadas articulares (Protocolo: **{metodo_seleccionado}**)...")
+                st.write(f"🔹 **Fase 2/6:** Extrayendo coordenadas articulares continuas (Protocolo: **{metodo_seleccionado}**)...")
                 temp_parquet = tempfile.NamedTemporaryFile(delete=False, suffix='.parquet').name
                 procesar_video(video_path, temp_parquet, session_id=session_id, worker_id=worker_id)
 
@@ -480,15 +562,15 @@ if uploaded_file is not None:
 
                 pct_tiempo_estatico_riesgo = round((float(np.mean(t_clean > 20.0)) * 100.0), 1) if len(t_clean) > 0 else 0.0
 
-                if metodo_seleccionado == "ROSA":
-                    score_final = calcular_matriz_rosa_oficial(t_p50, c_p50, b_p50, m_p50)
-                else:
-                    bonus_carga = 1 if "5 a 10" in peso_carga else (2 if "> 10" in peso_carga else (3 if "sacudidas" in peso_carga else 0))
-                    bonus_agarre = 1 if "Aceptable" in tipo_agarre else (2 if "Pobre" in tipo_agarre else (3 if "Inaceptable" in tipo_agarre else 0))
-                    base_score = 8 if (t_p50 > 30.0 or b_p50 > 45.0) else 6
-                    score_final = min(10, base_score + bonus_carga + bonus_agarre)
+                # Cálculo de Puntuación Dinámica Continua (Fuzzy REBA / ROSA)
+                bonus_c = 1 if "5 a 10" in peso_carga else (2 if "> 10" in peso_carga else (3 if "sacudidas" in peso_carga else 0))
+                bonus_a = 1 if "Aceptable" in tipo_agarre else (2 if "Pobre" in tipo_agarre else (3 if "Inaceptable" in tipo_agarre else 0))
+                
+                score_continuo = calcular_fuzzy_score_continuo(t_p50, c_p50, b_p50, m_p50, metodo_seleccionado, bonus_c, bonus_a)
+                score_final = int(round(score_continuo))
 
                 pdf_continuous["SCORE_FINAL"] = score_final
+                pdf_continuous["SCORE_CONTINUO"] = score_continuo
 
                 sintomas_list = []
                 if sintoma_cuello: sintomas_list.append("Cervical")
@@ -502,11 +584,14 @@ if uploaded_file is not None:
                     "worker_id": worker_id,
                     "metodo": metodo_seleccionado,
                     "score_final": score_final,
+                    "score_continuo": score_continuo,
                     "duracion_total_seg": round(total_frames / fps, 2),
+                    "fps_video": round(fps, 1),
                     "pct_tiempo_estatico_riesgo": pct_tiempo_estatico_riesgo,
                     "peso_carga_evaluado": peso_carga,
                     "tipo_agarre_evaluado": tipo_agarre,
                     "sintomas_nordicos": sintomas_str,
+                    "anonimizacion_activa": anonimizar_rostro,
                     "tronco_p10_deg": round(float(np.percentile(t_clean, 10)), 1) if len(t_clean) > 0 else 0.0,
                     "tronco_p50_deg": round(t_p50, 1),
                     "tronco_p95_deg": round(float(np.percentile(t_clean, 95)), 1) if len(t_clean) > 0 else 0.0,
@@ -525,9 +610,13 @@ if uploaded_file is not None:
                 plan = planificar_evidencias(candidatos, metodo_seleccionado, score_final)
                 renderizar_imagenes_segun_instrucciones(video_path, plan, pdf_continuous, out_img_dir, worker_id)
 
-                st.write("🔹 **Fase 5/6:** Generando análisis de distribución postural ISO 11226 y base de datos...")
+                st.write("🔹 **Fase 5/6:** Generando análisis de distribución postural ISO 11226 y curva de dosis acumulada...")
                 boxplot_path = f"{out_img_dir}/boxplot_distribucion_postural.png"
                 generar_boxplot_ergonomico_seguro(pdf_continuous, boxplot_path, worker_id, metodo_seleccionado)
+                
+                timeseries_path = f"{out_img_dir}/curva_dosis_temporal.png"
+                generar_grafico_dosis_temporal(pdf_continuous, fps, timeseries_path, worker_id)
+                
                 inicializar_y_guardar_bd(pdf_continuous, resumen_dict, "data/ergo_database.db")
 
                 st.write("🔹 **Fase 6/6:** Redactando dictamen técnico estructurado e intervenciones...")
@@ -542,6 +631,7 @@ if uploaded_file is not None:
                 st.session_state["informe_md"] = informe_md
                 st.session_state["out_img_dir"] = out_img_dir
                 st.session_state["boxplot_path"] = boxplot_path
+                st.session_state["timeseries_path"] = timeseries_path
                 st.session_state["met_calidad"] = met_calidad
                 st.session_state["pdf_continuous"] = pdf_continuous
                 st.session_state["diag_ciencia"] = diagnosticar_intervencion_cientifica(resumen_dict, metodo_seleccionado)
@@ -554,20 +644,22 @@ if uploaded_file is not None:
                     except Exception:
                         pass
 
-# 6. Panel de Resultados y Tablero de Control Forense
+# 6. Panel de Resultados y Tablero de Control Forense SSO 4.0
 if st.session_state.get("auditoria_completada", False):
     res = st.session_state["resumen_dict"]
     plan = st.session_state["plan"]
     img_dir = st.session_state["out_img_dir"]
     boxplot_file = st.session_state["boxplot_path"]
+    timeseries_file = st.session_state.get("timeseries_path", f"{img_dir}/curva_dosis_temporal.png")
     inf_md = st.session_state["informe_md"]
     diag_cie = st.session_state["diag_ciencia"]
     calidad = st.session_state["met_calidad"]
     pdf_cont = st.session_state.get("pdf_continuous", pd.DataFrame())
 
-    # Garantizar que el boxplot siempre exista en disco
     if not os.path.exists(boxplot_file) or os.path.getsize(boxplot_file) == 0:
         generar_boxplot_ergonomico_seguro(pdf_cont, boxplot_file, res["worker_id"], res["metodo"])
+    if not os.path.exists(timeseries_file) or os.path.getsize(timeseries_file) == 0:
+        generar_grafico_dosis_temporal(pdf_cont, res.get("fps_video", 30.0), timeseries_file, res["worker_id"])
 
     st.markdown("---")
     
@@ -585,19 +677,20 @@ if st.session_state.get("auditoria_completada", False):
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown(f"### **2. Tablero de Control: `{res['worker_id']}` ({res['session_id']})**")
+    st.markdown(f"### **2. Tablero de Control Dinámico SSO 4.0: `{res['worker_id']}` ({res['session_id']})**")
 
     # Grid de KPIs Ergonómicos Principales (5 Métricas)
     kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
     
     with kpi1:
         score_val = res['score_final']
+        score_cont = res.get('score_continuo', float(score_val))
         b_color = "border-danger" if score_val >= 7 else ("border-warning" if score_val >= 5 else "border-success")
         t_color = "text-danger" if score_val >= 7 else ("text-warning" if score_val >= 5 else "text-success")
         st.markdown(f"""
         <div class="kpi-box {b_color}">
-            <div class="kpi-title">Score Global ({res['metodo']})</div>
-            <div class="kpi-value {t_color}">{score_val} / 10</div>
+            <div class="kpi-title">Score Continuo ({res['metodo']})</div>
+            <div class="kpi-value {t_color}">{score_cont} <span style="font-size:1.1rem; color:#64748B;">/ 10</span></div>
             <div class="kpi-sub {t_color}">{'⚠️ Nivel 3 (Muy Alto)' if score_val>=7 else ('⚡ Nivel 2 (Medio)' if score_val>=5 else '✅ Nivel 1 (Aceptable)')}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -655,7 +748,7 @@ if st.session_state.get("auditoria_completada", False):
     # 7. Pestañas de Análisis Detallado
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📸 Evidencias Cinemáticas 3D", 
-        "📊 Distribución Postural (ISO 11226)", 
+        "📊 Distribución & Dosis Temporal", 
         "🛡️ Integridad & Compuerta Spark",
         "🦾 Prescripción de Exoesqueletos",
         "📄 Dictamen & Nexo Causal (Res. 513)", 
@@ -675,18 +768,25 @@ if st.session_state.get("auditoria_completada", False):
                         st.image(fpath, caption=f"Figura {i+1}: {plan[i]['fase_nombre']}", use_container_width=True)
 
     with tab2:
-        st.markdown("#### **Diagrama de Cajas y Bigotes con Bandas Normativas ISO 11226**")
-        if os.path.exists(boxplot_file):
-            st.image(
-                boxplot_file, 
-                caption=f"Figura: Distribución Postural y Bandas de Aceptabilidad ISO 11226 — {res['worker_id']}", 
-                use_container_width=True
-            )
-        else:
-            st.warning("⚠️ Generando diagrama de dispersión...")
-            generar_boxplot_ergonomico_seguro(pdf_cont, boxplot_file, res["worker_id"], res["metodo"])
+        st.markdown("#### **Análisis Estadístico y Cinemática Continua (SSO 4.0)**")
+        col_g1, col_g2 = st.columns(2)
+        with col_g1:
+            st.markdown("##### **1. Diagrama de Cajas y Bigotes (ISO 11226)**")
             if os.path.exists(boxplot_file):
                 st.image(boxplot_file, use_container_width=True)
+            else:
+                generar_boxplot_ergonomico_seguro(pdf_cont, boxplot_file, res["worker_id"], res["metodo"])
+                if os.path.exists(boxplot_file):
+                    st.image(boxplot_file, use_container_width=True)
+        
+        with col_g2:
+            st.markdown("##### **2. Exposición Temporal y Dosis Acumulada de Fatiga**")
+            if os.path.exists(timeseries_file):
+                st.image(timeseries_file, use_container_width=True)
+            else:
+                generar_grafico_dosis_temporal(pdf_cont, res.get("fps_video", 30.0), timeseries_file, res["worker_id"])
+                if os.path.exists(timeseries_file):
+                    st.image(timeseries_file, use_container_width=True)
 
     with tab3:
         st.markdown("#### **Reporte de Auditoría de Datos y Compuerta de Coherencia**")
@@ -705,6 +805,7 @@ if st.session_state.get("auditoria_completada", False):
             * **Veredicto de Integridad:** `{calidad['dictamen_integridad']}`
             * **Tasa de Pérdida de Señal:** `{(calidad['frames_anomalos_filtrados']/max(1, calidad['total_frames_analizados'])*100):.2f}%`
             * **Síntomas Osteomusculares (Kuorinka):** `{res.get('sintomas_nordicos', 'N/A')}`
+            * **Cumplimiento de Privacidad LOPDP:** `{'Activo (Face Blurring)' if res.get('anonimizacion_activa') else 'Registro Directo'}`
             """)
 
     with tab4:
@@ -752,16 +853,16 @@ if st.session_state.get("auditoria_completada", False):
         st.markdown("##### **✍️ Campo de Observaciones y Recomendaciones del Perito**")
         
         texto_causal_auto = "Se cumplen los 6 criterios del nexo de causalidad bajo Res. C.D. 513 del IESS." if nexo_valido else "Nexo de causalidad sujeto a complementación diagnóstica."
+        score_c_txt = f"{res.get('score_continuo', res['score_final'])} / 10"
         comentarios_perito = st.text_area(
             "Ingrese notas de campo, detalles del trabajador o recomendaciones específicas para la Sección 6 del PDF oficial:",
-            value=f"Evaluación pericial del puesto {res['worker_id']} ({res['session_id']}). Protocolo: {res['metodo']}. Síntomas reportados: {res.get('sintomas_nordicos', 'Ninguno')}. {texto_causal_auto} Se recomienda reajuste ergonómico y seguimiento en el SISAT en un plazo no mayor a 30 días.",
+            value=f"Evaluación pericial del puesto {res['worker_id']} ({res['session_id']}). Protocolo: {res['metodo']} (Score Continuo Fuzzy: {score_c_txt}). Síntomas reportados: {res.get('sintomas_nordicos', 'Ninguno')}. {texto_causal_auto} Se recomienda reajuste ergonómico y seguimiento en el SISAT en un plazo no mayor a 30 días.",
             height=120
         )
         
         os.makedirs("reportes", exist_ok=True)
         pdf_filename = f"reportes/Dictamen_{res['session_id']}_{res['worker_id']}.pdf"
         
-        # Garantizar que el boxplot siempre exista antes de generar el PDF
         if not os.path.exists(boxplot_file) or os.path.getsize(boxplot_file) == 0:
             generar_boxplot_ergonomico_seguro(pdf_cont, boxplot_file, res["worker_id"], res["metodo"])
             

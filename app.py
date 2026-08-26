@@ -532,6 +532,7 @@ with st.sidebar:
         st.markdown("### **IH&T Services**")
         st.caption("Industrial Hygiene & Occupational Health Consulting")
     
+    # Control de Sesión Activa
     user_actual = st.session_state.get("usuario_actual", "Perito")
     st.markdown(f"👤 **Sesión Activa:** `{user_actual}`")
     if st.button("🚪 Cerrar Sesión", use_container_width=True):

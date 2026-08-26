@@ -37,7 +37,7 @@ def verificar_credenciales(usuario, password):
     Verifica las credenciales contra st.secrets o contraseñas autorizadas.
     """
     if hasattr(st, "secrets") and "passwords" in st.secrets:
-        if usuario in st.secrets["passwords"] and st.secrets["passwords"][usuario] == password:
+        if usuario in st.secrets["passwords"] and str(st.secrets["passwords"][usuario]) == str(password):
             return True
             
     credenciales_iht = {
@@ -532,7 +532,6 @@ with st.sidebar:
         st.markdown("### **IH&T Services**")
         st.caption("Industrial Hygiene & Occupational Health Consulting")
     
-    # Control de Sesión Activa
     user_actual = st.session_state.get("usuario_actual", "Perito")
     st.markdown(f"👤 **Sesión Activa:** `{user_actual}`")
     if st.button("🚪 Cerrar Sesión", use_container_width=True):
@@ -914,8 +913,9 @@ if st.session_state.get("auditoria_completada", False):
         st.markdown("##### **📑 Interpretación Científica y Fundamentación Biomecánica (SSO 4.0)**")
         
         p_cientificos = generar_analisis_cientifico_graficos(res).split("\n\n")
-        st.info(p_cientificos[0])
-        st.info(p_cientificos)
+        for p_item in p_cientificos:
+            if p_item.strip():
+                st.info(p_item.strip())
 
     with tab3:
         st.markdown("#### **Reporte de Auditoría de Datos y Compuerta de Coherencia**")

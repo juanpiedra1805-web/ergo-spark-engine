@@ -85,8 +85,6 @@ def render_login():
                     st.error("❌ Usuario o contraseña incorrectos. Verifique sus credenciales.")
                     
         st.markdown("<div style='text-align:center; font-size:0.78rem; color:#64748B; margin-top:10px;'>Acceso exclusivo para personal autorizado de <b>IH&T Services</b>. Conforme a la Ley Orgánica de Protección de Datos Personales (LOPDP).</div>", unsafe_allow_html=True)
-
-# Compuerta de Seguridad: Bloquea la carga hasta autenticar
 if "autenticado" not in st.session_state:
     st.session_state["autenticado"] = False
     st.session_state["usuario_actual"] = ""

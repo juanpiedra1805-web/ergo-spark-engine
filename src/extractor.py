@@ -125,7 +125,7 @@ def procesar_video(video_path: str, output_parquet_path: str = None, session_id:
                 es_alucinacion = True
             if raw_ank[1] < r_hip[1]:
                 es_alucinacion = True
-            
+                
             if vis_ank < 0.35 or es_alucinacion:
                 es_ocluido = 1
                 estado_postura = "OCLUSION POR ESCRITORIO"

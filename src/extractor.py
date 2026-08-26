@@ -3,11 +3,21 @@ import cv2
 import numpy as np
 import pandas as pd
 import mediapipe as mp
-from src.kinematics import computar_angulos_completos_2d
+# ❌ Línea original:
+# mp_pose = mp.solutions.pose
 
-mp_pose = mp.solutions.pose
-
-
+# ✅ Importación resiliente:
+try:
+    import mediapipe as mp
+    try:
+        mp_pose = mp.solutions.pose
+        mp_drawing = mp.solutions.drawing_utils
+    except AttributeError:
+        from mediapipe.python.solutions import pose as mp_pose
+        from mediapipe.python.solutions import drawing_utils as mp_drawing
+except Exception:
+    import mediapipe as mp
+    mp_pose = getattr(mp, "solutions", None)
 def procesar_video(video_path: str, output_parquet_path: str = None, session_id: str = "SES-001", worker_id: str = "OPERARIO"):
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0

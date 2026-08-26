@@ -13,15 +13,17 @@ def generar_boxplot_cinematico(resumen: dict, output_path: str):
     c_p50 = float(resumen.get('cuello_p50_deg', 29.7))
     b_p50 = float(resumen.get('brazo_p50_deg', 10.1))
     m_p50 = float(resumen.get('muneca_p50_deg', 13.8))
-    r_p50 = float(resumen.get('rodilla_p50_deg', 92.4))
+    inf_ocluido = bool(resumen.get('miembros_inf_ocluido', False))
 
     segmentos = [
         {"data": np.clip(np.random.normal(t_p50, 1.8, 100), 0, 90), "label": "Tronco\n(<20°)", "uv": 20, "ua": 45},
         {"data": np.clip(np.random.normal(c_p50, 2.2, 100), 0, 90), "label": "Cuello/Cara\n(<25°)", "uv": 25, "ua": 35},
         {"data": np.clip(np.random.normal(b_p50, 2.5, 100), 0, 110), "label": "Brazo\n(<20°)", "uv": 20, "ua": 45},
         {"data": np.clip(np.random.normal(m_p50, 1.8, 100), 0, 60), "label": "Muñeca\n(<15°)", "uv": 15, "ua": 25},
-        {"data": np.clip(np.random.normal(r_p50, 2.0, 100), 60, 130), "label": "Pierna/Rod.\n(80°-100°)", "uv": 100, "ua": 115}
     ]
+    if not inf_ocluido:
+        r_p50 = float(str(resumen.get('miembros_inf_p50', 92.4)).replace('°', ''))
+        segmentos.append({"data": np.clip(np.random.normal(r_p50, 2.0, 100), 60, 130), "label": "Pierna/Rod.\n(80°-100°)", "uv": 100, "ua": 115})
     
     ancho_col = 0.38
     datos = []
@@ -96,9 +98,11 @@ def generar_pdf_pericial(resumen: dict, plan: list, img_dir: str, output_pdf_pat
     m_p50 = float(resumen.get('muneca_p50_deg', 13.8))
     m_p95 = float(resumen.get('muneca_p95_deg', 18.2))
 
-    r_p10 = float(resumen.get('rodilla_p10_deg', 88.0))
-    r_p50 = float(resumen.get('rodilla_p50_deg', 92.4))
-    r_p95 = float(resumen.get('rodilla_p95_deg', 96.0))
+    inf_ocluido = bool(resumen.get('miembros_inf_ocluido', False))
+    r_p10_txt = str(resumen.get('miembros_inf_p10', 'N/D'))
+    r_p50_txt = str(resumen.get('miembros_inf_p50', 'N/D'))
+    r_p95_txt = str(resumen.get('miembros_inf_p95', 'N/D'))
+    r_p50 = None if inf_ocluido else float(str(r_p50_txt).replace('°', ''))
 
     score_final = int(resumen.get('score_final', 4))
     metodo = str(resumen.get('metodo', 'ROSA')).upper()
@@ -107,7 +111,7 @@ def generar_pdf_pericial(resumen: dict, plan: list, img_dir: str, output_pdf_pat
     conf_cuello = "Conforme (< 25 deg)" if c_p50 <= 25.0 else ("Alerta (25-35 deg)" if c_p50 <= 35.0 else "No Conforme (> 35 deg)")
     conf_brazo = "Conforme (< 20 deg)" if b_p50 <= 20.0 else ("Alerta (20-45 deg)" if b_p50 <= 45.0 else "No Conforme (> 45 deg)")
     conf_muneca = "Conforme (< 15 deg)" if m_p50 <= 15.0 else ("Alerta (15-25 deg)" if m_p50 <= 25.0 else "No Conforme (> 25 deg)")
-    conf_rodilla = "Conforme (80-100 deg)" if (80.0 <= r_p50 <= 100.0) else "Alerta / Reajustar Altura"
+    conf_rodilla = "No Evaluable (Oclusion por Escritorio - Sin Imputacion Artificial)" if inf_ocluido else ("Conforme (80-100 deg)" if (80.0 <= r_p50 <= 100.0) else "Alerta / Reajustar Altura")
 
     if score_final <= 4:
         nivel_txt = "Nivel 1: Riesgo Bajo / Postura Aceptable"
@@ -186,7 +190,7 @@ def generar_pdf_pericial(resumen: dict, plan: list, img_dir: str, output_pdf_pat
         ("Cuello (C7-Cara)", f"{c_p10:.1f} deg", f"{c_p50:.1f} deg", f"{c_p95:.1f} deg", conf_cuello),
         ("Brazo / Hombro", f"{b_p10:.1f} deg", f"{b_p50:.1f} deg", f"{b_p95:.1f} deg", conf_brazo),
         ("Muñeca / Mano", f"{m_p10:.1f} deg", f"{m_p50:.1f} deg", f"{m_p95:.1f} deg", conf_muneca),
-        ("Miembros Inferiores", f"{r_p10:.1f} deg", f"{r_p50:.1f} deg", f"{r_p95:.1f} deg", conf_rodilla)
+        ("Miembros Inferiores", r_p10_txt, r_p50_txt, r_p95_txt, conf_rodilla)
     ]
     for seg, p10, p50, p95, estado in segmentos:
         pdf.cell(45, 3.6, " " + seg, 1, 0, 'L')
@@ -206,11 +210,12 @@ def generar_pdf_pericial(resumen: dict, plan: list, img_dir: str, output_pdf_pat
     
     pdf.set_xy(116, pdf.get_y() + 1)
     pdf.set_font('helvetica', '', 7.2)
+    linea_rodilla = f"- Miembros Inferiores (P50 = {r_p50:.1f} deg): {conf_rodilla}.\n" if not inf_ocluido else f"- Miembros Inferiores: {conf_rodilla}.\n"
     box_desc = (
         f"Analisis de Caja (Box Plot):\n"
         f"- Tronco (P50 = {t_p50:.1f} deg): {conf_tronco}.\n"
         f"- Cuello (P50 = {c_p50:.1f} deg): {conf_cuello}.\n"
-        f"- Miembros Inferiores (P50 = {r_p50:.1f} deg): {conf_rodilla}.\n"
+        f"{linea_rodilla}"
         f"- Muñeca (P50 = {m_p50:.1f} deg): {conf_muneca}."
     )
     pdf.multi_cell(88, 3.5, box_desc, 0, 'L')
@@ -253,12 +258,13 @@ def generar_pdf_pericial(resumen: dict, plan: list, img_dir: str, output_pdf_pat
     pdf.set_font('helvetica', '', 8.5)
     pdf.set_text_color(0, 0, 0)
     obs_texto = observaciones_usuario if observaciones_usuario else "Ninguna observacion adicional registrada."
+    linea_concl_rodilla = f"3. Miembros Inferiores: Soporte articular de rodilla en P50 = {r_p50:.1f} deg ({conf_rodilla}).\n" if not inf_ocluido else f"3. Miembros Inferiores: {conf_rodilla}.\n"
     concl_txt = (
         "En estricta concordancia con el Decreto Ejecutivo 255, el Anexo 3 del MDT (Posturas Forzadas) y el Reglamento SISAT (Acuerdo MSP 00004-2026):\n\n"
         "DICTAMEN PERICIAL:\n"
         f"1. Telemetría de Tronco: Mediana P50 = {t_p50:.1f} deg ({conf_tronco}).\n"
         f"2. Telemetría de Cuello: Mediana P50 = {c_p50:.1f} deg ({conf_cuello}).\n"
-        f"3. Miembros Inferiores: Soporte articular de rodilla en P50 = {r_p50:.1f} deg ({conf_rodilla}).\n"
+        f"{linea_concl_rodilla}"
         f"4. Calificación Pericial del Puesto: {calif_legal} bajo el protocolo {metodo} ({score_final} puntos).\n\n"
         "OBSERVACIONES ESPECIFICAS DEL PERITO:\n" + obs_texto
     )

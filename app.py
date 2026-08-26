@@ -34,8 +34,8 @@ for p in ["logo.png", "assets/logo.png", "img/logo.png", "assets/logo.svg", "log
 
 def calcular_fuzzy_score_continuo(t_p50, c_p50, b_p50, m_p50, metodo="ROSA", bonus_carga=0, bonus_agarre=0):
     """
-    Calcula un puntaje continuo y suave utilizando lógica difusa (Fuzzy REBA/ROSA)
-    para evitar discontinuidades y 'score-jumping' en las fronteras angulares (SSO 4.0).
+    Calcula un puntaje continuo utilizando lógica difusa (Fuzzy REBA/ROSA)
+    para evitar discontinuidades y saltos de escala en las fronteras angulares (SSO 4.0).
     """
     if t_p50 <= 0:
         s_t = 1.0
@@ -114,9 +114,9 @@ def generar_boxplot_ergonomico_seguro(pdf_continuous, boxplot_path, worker_id, m
             ]
             labels = ['Tronco (Sagital)', 'Cuello (C7-Cara)', 'Brazo/Hombro', 'Muñeca/Mano', 'Miembros Inf.']
             
-        ax.axhspan(0, 20, color='#DCFCE7', alpha=0.65, label='Zona Conforme (ISO 11226 ≤20°)')
+        ax.axhspan(0, 20, color='#DCFCE7', alpha=0.65, label='Zona Conforme (ISO 11226 ≤ 20°)')
         ax.axhspan(20, 45, color='#FEF3C7', alpha=0.65, label='Zona de Alerta (20° - 45°)')
-        ax.axhspan(45, 120, color='#FEE2E2', alpha=0.65, label='Zona No Conforme / Riesgo (>45°)')
+        ax.axhspan(45, 120, color='#FEE2E2', alpha=0.65, label='Zona No Conforme / Riesgo (> 45°)')
         
         try:
             ax.boxplot(
@@ -141,7 +141,7 @@ def generar_boxplot_ergonomico_seguro(pdf_continuous, boxplot_path, worker_id, m
             )
             
         ax.set_title(f"Distribución Angular Postural (ISO 11226) — {worker_id} ({metodo})", fontsize=12, fontweight='bold', pad=12, color='#0F2D59')
-        ax.set_ylabel("Ángulo Articular (°)", fontsize=10, fontweight='bold', color='#1E293B')
+        ax.set_ylabel("Ángulo Articular (grados °)", fontsize=10, fontweight='bold', color='#1E293B')
         ax.grid(axis='y', linestyle='--', alpha=0.5)
         ax.set_ylim(0, 110)
         ax.legend(loc='upper right', framealpha=0.9, fontsize=8.5)
@@ -192,8 +192,8 @@ def generar_grafico_dosis_temporal(df_continuous, fps, output_path, worker_id):
 
 def generar_analisis_cientifico_graficos(res):
     """
-    Genera dinámicamente dos párrafos de análisis pericial-científico
-    fundamentados en la telemetría cinemática real y citando la literatura clave (SSO 4.0).
+    Genera dinámicamente dos párrafos de análisis pericial-científico en texto plano limpio
+    (sin código LaTeX ni caracteres rotos) fundamentados en la telemetría real y citando la literatura clave.
     """
     metodo = res.get('metodo', 'ROSA')
     worker_id = res.get('worker_id', 'OPERARIO')
@@ -205,8 +205,8 @@ def generar_analisis_cientifico_graficos(res):
     score_cont = res.get('score_continuo', res.get('score_final', 5.0))
     sintomas = res.get('sintomas_nordicos', 'Ninguno reportado')
     
-    t_estado = "No Conforme (>20°)" if t_p50 > 20 else "Conforme (≤20°)"
-    c_estado = "No Conforme (>25°)" if c_p50 > 25 else "Conforme (≤25°)"
+    t_estado = "No Conforme (> 20 grados)" if t_p50 > 20 else "Conforme (<= 20 grados)"
+    c_estado = "No Conforme (> 25 grados)" if c_p50 > 25 else "Conforme (<= 25 grados)"
     
     if "ROSA" in metodo:
         metodo_cita = "el protocolo ROSA (Sonne, Villalta & Andrews, 2012; ISO 9241-5)"
@@ -216,25 +216,25 @@ def generar_analisis_cientifico_graficos(res):
         metodo_cita = "el protocolo RULA (McAtamney & Corlett, 1993)"
 
     p1 = (
-        f"**1. Análisis Estadístico de Dispersión y Distribución Angular (ISO 11226:2000):** "
-        f"El análisis de cajas y bigotes (*Boxplot*) revela una dispersión angular sostenida en los segmentos axiales del puesto `{worker_id}`. "
-        f"La flexión de tronco registra una mediana postural de $P_{{50}} = {t_p50}^\\circ$ con percentil crítico $P_{{95}} = {t_p95}^\\circ$ ({t_estado}), "
-        f"mientras que la flexión cráneo-cervical se sitúa en una mediana de $P_{{50}} = {c_p50}^\\circ$ y $P_{{95}} = {c_p95}^\\circ$ ({c_estado}). "
-        f"Conforme a los criterios biomecánicos de la norma **ISO 11226:2000** y los fundamentos metodológicos de {metodo_cita}, "
-        f"las desviaciones angulares que superan los rangos neutros de confort ($>20^\\circ$ para tronco y $>25^\\circ$ para cuello) "
-        f"imponen un momento de fuerza gravitacional e incremento de solicitación en las estructuras lumbosacras y la musculatura paravertebral cervical "
-        f"(Kee & Karwowski, 2007; Kee, 2021), determinando un estado de riesgo cinemático objetivo."
+        f"1. Análisis Estadístico de Dispersión y Distribución Angular (ISO 11226:2000): "
+        f"El diagrama de cajas y bigotes (Boxplot) evidencia una dispersión postural sostenida en los segmentos axiales del puesto {worker_id}. "
+        f"La flexión de tronco registra una mediana postural de P50 = {t_p50}° con percentil crítico P95 = {t_p95}° ({t_estado}), "
+        f"mientras que la flexión cráneo-cervical alcanza una mediana de P50 = {c_p50}° y un P95 = {c_p95}° ({c_estado}). "
+        f"Conforme a los criterios biomecánicos de la norma internacional ISO 11226:2000 y el marco metodológico de {metodo_cita}, "
+        f"las desviaciones que superan los rangos neutros de confort (mayores a 20° en tronco y 25° en cuello) "
+        f"generan un incremento del momento de fuerza gravitacional sobre las estructuras lumbosacras y la musculatura paravertebral cervical "
+        f"(Kee & Karwowski, 2007; Kee, 2021), determinando una condición objetiva de sobrecarga articular."
     )
 
     p2 = (
-        f"**2. Cinemática Continua, Dosis Temporal y Acumulación de Fatiga (SSO 4.0):** "
-        f"La curva de exposición temporal continua evidencia que el trabajador mantiene posturas fuera de los límites de confort durante el **{pct_est}\\% del ciclo de muestreo**, "
-        f"acumulando una dosis postural progresiva que valida el Score Continuo Fuzzy de **{score_cont} / 10**. "
-        f"Bajo los paradigmas de Ergonomía 4.0 e inferencia cinemática markerless (*Huang, Jia & Wang, 2024; Bortolini et al., 2021*), "
-        f"la mantención ininterrumpida de flexiones axiales por períodos superiores a 4 segundos desencadena fenómenos de fatiga muscular estática sostenida y restricción de microcirculación local "
-        f"(*Rohmert, 1973; Sjøgaard & Søgaard, 1998*). "
-        f"Esta telemetría objetiva demuestra una relación dosis-respuesta biomecánica directa y concordancia topográfica con la sintomatología osteomuscular registrada ({sintomas}), "
-        f"satisfaciendo los criterios de plausibilidad biológica del Cuestionario Nórdico (*Kuorinka et al., 1987*), el **Anexo 3 del MDT** y el nexo de causalidad bajo la **Resolución C.D. 513 del IESS**."
+        f"2. Cinemática Continua, Dosis Temporal y Acumulación de Fatiga (SSO 4.0): "
+        f"La curva de exposición temporal demuestra que el trabajador mantiene posturas fuera de los límites de confort durante el {pct_est}% del tiempo de muestreo, "
+        f"acumulando una dosis de fatiga postural progresiva que valida el Score Continuo Fuzzy de {score_cont} / 10. "
+        f"Bajo los modelos de Ergonomía 4.0 e inferencia cinemática markerless (Huang, Jia & Wang, 2024; Bortolini et al., 2021), "
+        f"el mantenimiento ininterrumpido de flexiones axiales por períodos superiores a 4 segundos induce fatiga muscular estática sostenida e isquemia local transitoria "
+        f"(Rohmert, 1973; Sjøgaard & Søgaard, 1998). "
+        f"Esta telemetría objetiva demuestra una relación dosis-respuesta directa y concordancia topográfica con la sintomatología osteomuscular reportada ({sintomas}), "
+        f"cumpliendo los criterios de plausibilidad biológica del Cuestionario Nórdico (Kuorinka et al., 1987), el Anexo 3 del MDT y el nexo causal bajo la Resolución C.D. 513 del IESS."
     )
 
     return f"{p1}\n\n{p2}"
@@ -668,8 +668,17 @@ if uploaded_file is not None:
                 
                 inicializar_y_guardar_bd(pdf_continuous, resumen_dict, "data/ergo_database.db")
 
-                st.write("🔹 **Fase 6/6:** Redactando dictamen técnico estructurado e intervenciones...")
+                st.write("🔹 **Fase 6/6:** Redactando dictamen técnico estructurado y análisis científico...")
                 informe_md = generar_dictamen_ergonomico(resumen_dict, plan, metodo_seleccionado, f"img/{worker_id}")
+                
+                # Integración automática de los dos párrafos de fundamentación científica en el informe MD
+                analisis_cientifico_puros = generar_analisis_cientifico_graficos(resumen_dict)
+                resumen_dict["analisis_cientifico_txt"] = analisis_cientifico_puros
+                
+                if "5.1. Fundamentación Científica" not in informe_md:
+                    seccion_cientifica_md = f"\n\n### 5.1. Fundamentación Científica y Cinemática Continua (SSO 4.0)\n\n{analisis_cientifico_puros}\n"
+                    informe_md = informe_md + seccion_cientifica_md
+
                 archivo_reporte = f"reportes/Informe_{session_id}_{worker_id}.md"
                 with open(archivo_reporte, "w", encoding="utf-8") as f:
                     f.write(informe_md)
@@ -837,15 +846,13 @@ if st.session_state.get("auditoria_completada", False):
                 if os.path.exists(timeseries_file):
                     st.image(timeseries_file, use_container_width=True)
 
-        # Interpretación Científica Dinámica de Dos Párrafos con Citas Bibliográficas
+        # Interpretación Científica Dinámica de Dos Párrafos en Texto Limpio
         st.markdown("---")
         st.markdown("##### **📑 Interpretación Científica y Fundamentación Biomecánica (SSO 4.0)**")
-        analisis_cientifico_html = generar_analisis_cientifico_graficos(res).replace('\n\n', '</p><p style="margin-top:12px; line-height:1.55; color:#1E293B;">')
-        st.markdown(f"""
-        <div class="causal-card" style="border-left: 5px solid #0F2D59; background: #FFFFFF; padding: 20px 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
-            <p style="margin: 0; line-height: 1.55; color: #1E293B;">{analisis_cientifico_html}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        
+        p_cientificos = generar_analisis_cientifico_graficos(res).split("\n\n")
+        st.info(p_cientificos[0])
+        st.info(p_cientificos)
 
     with tab3:
         st.markdown("#### **Reporte de Auditoría de Datos y Compuerta de Coherencia**")
@@ -913,10 +920,13 @@ if st.session_state.get("auditoria_completada", False):
         
         texto_causal_auto = "Se cumplen los 6 criterios del nexo de causalidad bajo Res. C.D. 513 del IESS." if nexo_valido else "Nexo de causalidad sujeto a complementación diagnóstica."
         score_c_txt = f"{res.get('score_continuo', res['score_final'])} / 10"
+        
+        analisis_pericial_dinamico = generar_analisis_cientifico_graficos(res)
+        
         comentarios_perito = st.text_area(
             "Ingrese notas de campo, detalles del trabajador o recomendaciones específicas para la Sección 6 del PDF oficial:",
-            value=f"Evaluación pericial del puesto {res['worker_id']} ({res['session_id']}). Protocolo: {res['metodo']} (Score Continuo Fuzzy: {score_c_txt}). Síntomas reportados: {res.get('sintomas_nordicos', 'Ninguno')}. {texto_causal_auto} Se recomienda reajuste ergonómico y seguimiento en el SISAT en un plazo no mayor a 30 días.",
-            height=120
+            value=f"Evaluación pericial del puesto {res['worker_id']} ({res['session_id']}). Protocolo: {res['metodo']} (Score Continuo Fuzzy: {score_c_txt}). Síntomas reportados: {res.get('sintomas_nordicos', 'Ninguno')}. {texto_causal_auto}\n\n{analisis_pericial_dinamico}\n\nSe recomienda reajuste ergonómico del puesto de trabajo y seguimiento médico en el SISAT en un plazo no mayor a 30 días.",
+            height=180
         )
         
         os.makedirs("reportes", exist_ok=True)

@@ -1,7 +1,5 @@
 import numpy as np
 import pandas as pd
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
 
 # RANGOS ANATÓMICOS FISIOLÓGICOS (ISO 11226 / Biomecánica Ocupacional)
 LIMITES_ROM = {
@@ -13,13 +11,18 @@ LIMITES_ROM = {
 
 MAX_VELOCIDAD_ANGULAR_FRAME = 35.0  # Grados por frame (a 30 fps = > 1050°/s es artefacto óptico)
 
+
 def auditar_y_limpiar_telemetria_spark(df_angles):
     """
     Ejecuta el control de calidad pericial y compuerta de coherencia sobre PySpark DataFrame.
-    Retorna:
-      - df_clean: DataFrame filtrado sin artefactos de tracking.
-      - metricas_calidad: Dict con el índice de confiabilidad pericial (0 a 100%).
+    (Carga perezosa de PySpark para entornos distribuidos).
     """
+    try:
+        from pyspark.sql import functions as F
+        from pyspark.sql.window import Window
+    except ImportError:
+        raise ImportError("PySpark no está disponible en este entorno. Usa 'validar_coherencia_pandas'.")
+
     total_frames = df_angles.count()
     if total_frames == 0:
         return df_angles, {"score_confiabilidad": 0.0, "estado": "RECHAZADO_SIN_DATOS"}
@@ -32,7 +35,7 @@ def auditar_y_limpiar_telemetria_spark(df_angles):
         "valido_muneca": (F.col("ang_muneca_der") >= LIMITES_ROM["ang_muneca_der"][0]) & (F.col("ang_muneca_der") <= LIMITES_ROM["ang_muneca_der"][1])
     })
 
-    # 2. GATE 2: Filtro de Continuidad Temporal (Salto de Tracking / Multi-persona)
+    # 2. GATE 2: Filtro de Continuidad Temporal
     w_spec = Window.partitionBy("session_id", "worker_id").orderBy("frame_index")
     df_continuity = df_valid.withColumns({
         "lag_tronco": F.lag("ang_tronco", 1).over(w_spec),
@@ -45,17 +48,14 @@ def auditar_y_limpiar_telemetria_spark(df_angles):
         (F.col("delta_tronco") <= MAX_VELOCIDAD_ANGULAR_FRAME) & (F.col("delta_brazo") <= MAX_VELOCIDAD_ANGULAR_FRAME)
     )
 
-    # Frame íntegro y válido
     df_flagged = df_continuity.withColumn(
         "frame_valido",
         F.col("valido_tronco") & F.col("valido_cuello") & F.col("valido_brazo") & F.col("valido_muneca") & F.col("es_continuo")
     )
 
-    # Conteo de registros limpios
     frames_validos = df_flagged.filter(F.col("frame_valido") == True).count()
     ratio_calidad = round((frames_validos / total_frames) * 100.0, 1)
 
-    # 3. GATE 3: Veredicto de Certificación Pericial
     if ratio_calidad >= 90.0:
         dictamen_calidad = "EXCELENTE (Apto para Dictamen Pericial Forense)"
         color_badge = "success"
@@ -75,7 +75,6 @@ def auditar_y_limpiar_telemetria_spark(df_angles):
         "color_badge": color_badge
     }
 
-    # Retornar DataFrame limpio (si hay suficientes datos)
     df_clean = df_flagged.filter(F.col("frame_valido") == True) if frames_validos > 10 else df_angles
     return df_clean, metricas_calidad
 
@@ -94,7 +93,7 @@ def validar_coherencia_pandas(df_pdf: pd.DataFrame) -> tuple:
     m_brazo = (df_pdf["ang_brazo_der"] >= LIMITES_ROM["ang_brazo_der"][0]) & (df_pdf["ang_brazo_der"] <= LIMITES_ROM["ang_brazo_der"][1])
     m_muneca = (df_pdf["ang_muneca_der"] >= LIMITES_ROM["ang_muneca_der"][0]) & (df_pdf["ang_muneca_der"] <= LIMITES_ROM["ang_muneca_der"][1])
 
-    # Continuidad
+    # Continuidad temporal
     d_tronco = df_pdf["ang_tronco"].diff().abs().fillna(0.0)
     d_brazo = df_pdf["ang_brazo_der"].diff().abs().fillna(0.0)
     m_continuidad = (d_tronco <= MAX_VELOCIDAD_ANGULAR_FRAME) & (d_brazo <= MAX_VELOCIDAD_ANGULAR_FRAME)

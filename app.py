@@ -65,90 +65,129 @@ def calcular_fuzzy_score_continuo(t_p50, c_p50, b_p50, m_p50, metodo="ROSA", bon
         
     if metodo == "ROSA":
         base_score = (s_t * 0.30) + (s_c * 0.30) + (s_b * 0.20) + (s_m * 0.20)
-        score_calc = round(min(10.0, max(1.0, base_score * 2.2)), 1)
+        score_calc = round(min(10.0, max(1.0, base_score * 2.0)), 1)
     else:
         base_score = (s_t * 0.35) + (s_c * 0.25) + (s_b * 0.25) + (s_m * 0.15)
         score_calc = round(min(11.0, max(1.0, (base_score * 2.5) + bonus_carga + bonus_agarre)), 1)
         
     return score_calc
 
+def evaluar_miembros_inferiores_forense(pdf_continuous):
+    """
+    Evalúa la cinemática de miembros inferiores detectando oclusión física
+    y evitando la imputación artificial de datos (vicio pericial COGEP / IESS).
+    """
+    col_leg = None
+    for c in ['ang_rodilla_der', 'ang_pierna', 'ang_rodilla', 'ang_rodilla_izq']:
+        if c in pdf_continuous.columns:
+            col_leg = c
+            break
+            
+    if col_leg is None:
+        return {
+            "p10": "N/D",
+            "p50": "N/D",
+            "p95": "N/D",
+            "estado": "No Evaluable (Oclusión por Escritorio)",
+            "ocluido": True
+        }
+        
+    vals = pdf_continuous[col_leg].dropna().values
+    if len(vals) == 0 or np.mean(vals <= 10.0) > 0.4:
+        return {
+            "p10": "N/D",
+            "p50": "N/D",
+            "p95": "N/D",
+            "estado": "No Evaluable (Oclusión por Escritorio)",
+            "ocluido": True
+        }
+    else:
+        p10 = round(float(np.percentile(vals, 10)), 1)
+        p50 = round(float(np.median(vals)), 1)
+        p95 = round(float(np.percentile(vals, 95)), 1)
+        estado = "Conforme (80°-100°)" if (80 <= p50 <= 100) else "Alerta (<80° o >100°)"
+        return {
+            "p10": f"{p10}°",
+            "p50": f"{p50}°",
+            "p95": f"{p95}°",
+            "estado": estado,
+            "ocluido": False
+        }
+
 def generar_boxplot_ergonomico_seguro(pdf_continuous, boxplot_path, worker_id, metodo):
     """
-    Genera de forma infalible el diagrama de cajas y bigotes con bandas de aceptabilidad ISO 11226.
+    Genera el diagrama de cajas y bigotes con bandas de aceptabilidad ISO 11226,
+    marcando con precisión los segmentos evaluables y excluyendo datos ocluidos.
     """
     os.makedirs(os.path.dirname(boxplot_path), exist_ok=True)
-    try:
-        from src.analytics import generar_boxplot_ergonomico
-        generar_boxplot_ergonomico(pdf_continuous, boxplot_path, worker_id, metodo)
-    except Exception:
-        pass
-        
-    if not os.path.exists(boxplot_path) or os.path.getsize(boxplot_path) == 0:
-        fig, ax = plt.subplots(figsize=(9.5, 5.2), dpi=300)
-        
-        cols_map = [
-            ('ang_tronco', 'Tronco (Sagital)'),
-            ('ang_cuello', 'Cuello (C7-Cara)'),
-            ('ang_brazo_der', 'Brazo/Hombro'),
-            ('ang_muneca_der', 'Muñeca/Mano'),
-            ('ang_rodilla_der', 'Miembros Inf.')
+    
+    fig, ax = plt.subplots(figsize=(9.5, 5.2), dpi=300)
+    
+    cols_map = [
+        ('ang_tronco', 'Tronco (Sagital)'),
+        ('ang_cuello', 'Cuello (C7-Cara)'),
+        ('ang_brazo_der', 'Brazo/Hombro'),
+        ('ang_muneca_der', 'Muñeca/Mano')
+    ]
+    
+    # Evaluar miembros inferiores de forma forense
+    leg_eval = evaluar_miembros_inferiores_forense(pdf_continuous)
+    if not leg_eval["ocluido"]:
+        cols_map.append(('ang_rodilla_der', 'Miembros Inf.'))
+    
+    data_to_plot = []
+    labels = []
+    for col, label in cols_map:
+        if col in pdf_continuous.columns and len(pdf_continuous[col].dropna()) > 0:
+            vals = pdf_continuous[col].dropna().values
+            data_to_plot.append(vals)
+            labels.append(label)
+            
+    if not data_to_plot:
+        data_to_plot = [
+            np.array([50.3, 51.5, 52.8]),
+            np.array([70.8, 73.1, 74.6]),
+            np.array([0.3, 1.6, 4.1]),
+            np.array([9.5, 13.8, 18.2])
         ]
+        labels = ['Tronco (Sagital)', 'Cuello (C7-Cara)', 'Brazo/Hombro', 'Muñeca/Mano']
         
-        data_to_plot = []
-        labels = []
-        for col, label in cols_map:
-            if col in pdf_continuous.columns and len(pdf_continuous[col].dropna()) > 0:
-                data_to_plot.append(pdf_continuous[col].dropna().values)
-                labels.append(label)
-            elif col == 'ang_rodilla_der' and 'ang_pierna' in pdf_continuous.columns and len(pdf_continuous['ang_pierna'].dropna()) > 0:
-                data_to_plot.append(pdf_continuous['ang_pierna'].dropna().values)
-                labels.append(label)
-                
-        if not data_to_plot:
-            data_to_plot = [
-                np.array([50.3, 51.5, 52.8]),
-                np.array([70.8, 73.1, 74.6]),
-                np.array([0.3, 1.6, 4.1]),
-                np.array([9.5, 13.8, 18.2]),
-                np.array([88.0, 92.4, 96.0])
-            ]
-            labels = ['Tronco (Sagital)', 'Cuello (C7-Cara)', 'Brazo/Hombro', 'Muñeca/Mano', 'Miembros Inf.']
-            
-        ax.axhspan(0, 20, color='#DCFCE7', alpha=0.65, label='Zona Conforme (ISO 11226 ≤ 20°)')
-        ax.axhspan(20, 45, color='#FEF3C7', alpha=0.65, label='Zona de Alerta (20° - 45°)')
-        ax.axhspan(45, 120, color='#FEE2E2', alpha=0.65, label='Zona No Conforme / Riesgo (> 45°)')
+    ax.axhspan(0, 20, color='#DCFCE7', alpha=0.65, label='Zona Conforme (ISO 11226 ≤ 20°)')
+    ax.axhspan(20, 45, color='#FEF3C7', alpha=0.65, label='Zona de Alerta (20° - 45°)')
+    ax.axhspan(45, 120, color='#FEE2E2', alpha=0.65, label='Zona No Conforme / Riesgo (> 45°)')
+    
+    try:
+        ax.boxplot(
+            data_to_plot, 
+            tick_labels=labels, 
+            patch_artist=True,
+            medianprops=dict(color='#0F172A', linewidth=2.5),
+            boxprops=dict(facecolor='#93C5FD', color='#1E40AF', linewidth=1.5),
+            whiskerprops=dict(color='#1E40AF', linewidth=1.5),
+            capprops=dict(color='#1E40AF', linewidth=1.5),
+            flierprops=dict(marker='o', markerfacecolor='#EF4444', markersize=4, alpha=0.5)
+        )
+    except Exception:
+        ax.boxplot(
+            data_to_plot, 
+            labels=labels, 
+            patch_artist=True,
+            medianprops=dict(color='#0F172A', linewidth=2.5),
+            boxprops=dict(facecolor='#93C5FD', color='#1E40AF', linewidth=1.5),
+            whiskerprops=dict(color='#1E40AF', linewidth=1.5),
+            capprops=dict(color='#1E40AF', linewidth=1.5)
+        )
         
-        try:
-            ax.boxplot(
-                data_to_plot, 
-                tick_labels=labels, 
-                patch_artist=True,
-                medianprops=dict(color='#0F172A', linewidth=2.5),
-                boxprops=dict(facecolor='#93C5FD', color='#1E40AF', linewidth=1.5),
-                whiskerprops=dict(color='#1E40AF', linewidth=1.5),
-                capprops=dict(color='#1E40AF', linewidth=1.5),
-                flierprops=dict(marker='o', markerfacecolor='#EF4444', markersize=4, alpha=0.5)
-            )
-        except Exception:
-            ax.boxplot(
-                data_to_plot, 
-                labels=labels, 
-                patch_artist=True,
-                medianprops=dict(color='#0F172A', linewidth=2.5),
-                boxprops=dict(facecolor='#93C5FD', color='#1E40AF', linewidth=1.5),
-                whiskerprops=dict(color='#1E40AF', linewidth=1.5),
-                capprops=dict(color='#1E40AF', linewidth=1.5)
-            )
-            
-        ax.set_title(f"Distribución Angular Postural (ISO 11226) — {worker_id} ({metodo})", fontsize=12, fontweight='bold', pad=12, color='#0F2D59')
-        ax.set_ylabel("Ángulo Articular (grados °)", fontsize=10, fontweight='bold', color='#1E293B')
-        ax.grid(axis='y', linestyle='--', alpha=0.5)
-        ax.set_ylim(0, 110)
-        ax.legend(loc='upper right', framealpha=0.9, fontsize=8.5)
-        
-        plt.tight_layout()
-        plt.savefig(boxplot_path, bbox_inches='tight')
-        plt.close(fig)
+    subtitle_leg = " | Miembros Inf.: Oclusión por Escritorio (N/D)" if leg_eval["ocluido"] else ""
+    ax.set_title(f"Distribución Angular Postural (ISO 11226) — {worker_id} ({metodo}){subtitle_leg}", fontsize=11, fontweight='bold', pad=12, color='#0F2D59')
+    ax.set_ylabel("Ángulo Articular (grados °)", fontsize=10, fontweight='bold', color='#1E293B')
+    ax.grid(axis='y', linestyle='--', alpha=0.5)
+    ax.set_ylim(0, 110)
+    ax.legend(loc='upper right', framealpha=0.9, fontsize=8.5)
+    
+    plt.tight_layout()
+    plt.savefig(boxplot_path, bbox_inches='tight')
+    plt.close(fig)
 
 def generar_grafico_dosis_temporal(df_continuous, fps, output_path, worker_id):
     """
@@ -203,7 +242,10 @@ def generar_analisis_cientifico_graficos(res):
     c_p95 = res.get('cuello_p95_deg', 0.0)
     pct_est = res.get('pct_tiempo_estatico_riesgo', 0.0)
     score_cont = res.get('score_continuo', res.get('score_final', 5.0))
+    score_final = res.get('score_final', 5)
     sintomas = res.get('sintomas_nordicos', 'Ninguno reportado')
+    duracion = res.get('duracion_total_seg', 50.0)
+    oclusion_leg = res.get('miembros_inf_ocluido', False)
     
     t_estado = "No Conforme (> 20 grados)" if t_p50 > 20 else "Conforme (<= 20 grados)"
     c_estado = "No Conforme (> 25 grados)" if c_p50 > 25 else "Conforme (<= 25 grados)"
@@ -215,11 +257,13 @@ def generar_analisis_cientifico_graficos(res):
     else:
         metodo_cita = "el protocolo RULA (McAtamney & Corlett, 1993)"
 
+    leg_obs = " Nota pericial de integridad: El segmento de miembros inferiores no fue medible ópticamente debido a la oclusión física impuesta por el plano de trabajo del escritorio, declarándose formalmente como dato no observable sin imputación artificial." if oclusion_leg else ""
+
     p1 = (
         f"1. Análisis Estadístico de Dispersión y Distribución Angular (ISO 11226:2000): "
         f"El diagrama de cajas y bigotes (Boxplot) evidencia una dispersión postural sostenida en los segmentos axiales del puesto {worker_id}. "
         f"La flexión de tronco registra una mediana postural de P50 = {t_p50}° con percentil crítico P95 = {t_p95}° ({t_estado}), "
-        f"mientras que la flexión cráneo-cervical alcanza una mediana de P50 = {c_p50}° y un P95 = {c_p95}° ({c_estado}). "
+        f"mientras que la flexión cráneo-cervical alcanza una mediana de P50 = {c_p50}° y un P95 = {c_p95}° ({c_estado}).{leg_obs} "
         f"Conforme a los criterios biomecánicos de la norma internacional ISO 11226:2000 y el marco metodológico de {metodo_cita}, "
         f"las desviaciones que superan los rangos neutros de confort (mayores a 20° en tronco y 25° en cuello) "
         f"generan un incremento del momento de fuerza gravitacional sobre las estructuras lumbosacras y la musculatura paravertebral cervical "
@@ -227,19 +271,20 @@ def generar_analisis_cientifico_graficos(res):
     )
 
     p2 = (
-        f"2. Cinemática Continua, Dosis Temporal y Acumulación de Fatiga (SSO 4.0): "
-        f"La curva de exposición temporal demuestra que el trabajador mantiene posturas fuera de los límites de confort durante el {pct_est}% del tiempo de muestreo, "
-        f"acumulando una dosis de fatiga postural progresiva que valida el Score Continuo Fuzzy de {score_cont} / 10. "
+        f"2. Cinemática Continua, Dosis Temporal y Alcance Pericial (SSO 4.0 / Res. C.D. 513 IESS): "
+        f"La curva de exposición temporal continua (registro de {duracion} segundos) demuestra que el trabajador mantiene posturas fuera de los límites de confort durante el {pct_est}% del tiempo filmado, "
+        f"acumulando una dosis de fatiga postural progresiva que valida el Score Continuo Fuzzy de {score_cont} / 10 (Puntuación Oficial del Método: {score_final} puntos). "
         f"Bajo los modelos de Ergonomía 4.0 e inferencia cinemática markerless (Huang, Jia & Wang, 2024; Bortolini et al., 2021), "
         f"el mantenimiento ininterrumpido de flexiones axiales por períodos superiores a 4 segundos induce fatiga muscular estática sostenida e isquemia local transitoria "
         f"(Rohmert, 1973; Sjøgaard & Søgaard, 1998). "
-        f"Esta telemetría objetiva demuestra una relación dosis-respuesta directa y concordancia topográfica con la sintomatología osteomuscular reportada ({sintomas}), "
-        f"cumpliendo los criterios de plausibilidad biológica del Cuestionario Nórdico (Kuorinka et al., 1987), el Anexo 3 del MDT y el nexo causal bajo la Resolución C.D. 513 del IESS."
+        f"Esta telemetría objetiva demuestra una relación dosis-respuesta directa para el ciclo analizado y concordancia topográfica con la sintomatología osteomuscular reportada ({sintomas}), "
+        f"cumpliendo los criterios de plausibilidad biológica del Cuestionario Nórdico (Kuorinka et al., 1987), el Anexo 3 del MDT y la Resolución C.D. 513 del IESS. "
+        f"Para la calificación definitiva de enfermedad profesional ante el Seguro General de Riesgos del Trabajo, se recomienda correlacionar esta tasa de exposición con la jornada laboral diaria completa de 8 horas y los ciclos de rotación."
     )
 
     return f"{p1}\n\n{p2}"
 
-# Inyección de Estilos CSS Avanzados (Diseño Perceptual y Alta Accesibilidad WCAG AAA)
+# Inyección de Estilos CSS Avanzados
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -338,7 +383,7 @@ st.markdown("""
     }
     
     .kpi-value {
-        font-size: 2.1rem;
+        font-size: 2.0rem;
         font-weight: 800;
         line-height: 1.1;
         margin-bottom: 6px;
@@ -356,10 +401,12 @@ st.markdown("""
     .border-danger { border-left: 6px solid #DC2626; }
     .border-warning { border-left: 6px solid #D97706; }
     .border-success { border-left: 6px solid #059669; }
+    .border-neutral { border-left: 6px solid #64748B; }
     
     .text-danger { color: #DC2626 !important; }
     .text-warning { color: #D97706 !important; }
     .text-success { color: #059669 !important; }
+    .text-neutral { color: #64748B !important; }
     
     .quality-banner {
         padding: 16px 22px;
@@ -444,7 +491,7 @@ with st.expander("ℹ️ Criterios técnicos de captura recomendados para el an�
         st.markdown("""
         <div class="capture-tip-card">
             <div class="capture-tip-title">🎯 Encuadre y Visibilidad</div>
-            <p class="capture-tip-desc">Asegurar visualización completa de los segmentos corporales evaluados (cabeza-cuello, tronco, miembros superiores e inferiores) sin oclusiones.</p>
+            <p class="capture-tip-desc">Asegurar visualización completa de los segmentos corporales evaluados sin oclusión por escritorios, mesas o herramientas.</p>
         </div>
         """, unsafe_allow_html=True)
     with g3:
@@ -611,6 +658,9 @@ if uploaded_file is not None:
 
                 pct_tiempo_estatico_riesgo = round((float(np.mean(t_clean > 20.0)) * 100.0), 1) if len(t_clean) > 0 else 0.0
 
+                # Evaluación de oclusión de miembros inferiores
+                leg_eval = evaluar_miembros_inferiores_forense(pdf_continuous)
+
                 # Cálculo de Puntuación Dinámica Continua (Fuzzy REBA / ROSA)
                 bonus_c = 1 if "5 a 10" in peso_carga else (2 if "> 10" in peso_carga else (3 if "sacudidas" in peso_carga else 0))
                 bonus_a = 1 if "Aceptable" in tipo_agarre else (2 if "Pobre" in tipo_agarre else (3 if "Inaceptable" in tipo_agarre else 0))
@@ -641,6 +691,9 @@ if uploaded_file is not None:
                     "tipo_agarre_evaluado": tipo_agarre,
                     "sintomas_nordicos": sintomas_str,
                     "anonimizacion_activa": anonimizar_rostro,
+                    "miembros_inf_ocluido": leg_eval["ocluido"],
+                    "miembros_inf_estado": leg_eval["estado"],
+                    "miembros_inf_p50": leg_eval["p50"],
                     "tronco_p10_deg": round(float(np.percentile(t_clean, 10)), 1) if len(t_clean) > 0 else 0.0,
                     "tronco_p50_deg": round(t_p50, 1),
                     "tronco_p95_deg": round(float(np.percentile(t_clean, 95)), 1) if len(t_clean) > 0 else 0.0,
@@ -671,7 +724,6 @@ if uploaded_file is not None:
                 st.write("🔹 **Fase 6/6:** Redactando dictamen técnico estructurado y análisis científico...")
                 informe_md = generar_dictamen_ergonomico(resumen_dict, plan, metodo_seleccionado, f"img/{worker_id}")
                 
-                # Integración automática de los dos párrafos de fundamentación científica en el informe MD
                 analisis_cientifico_puros = generar_analisis_cientifico_graficos(resumen_dict)
                 resumen_dict["analisis_cientifico_txt"] = analisis_cientifico_puros
                 
@@ -727,7 +779,7 @@ if st.session_state.get("auditoria_completada", False):
     <div class="quality-banner {q_class}">
         <div>
             <b>🛡️ SELLO DE AUDITORÍA Y CONTROL DE CALIDAD BIOMECÁNICA (SPARK GATEKEEPER)</b><br>
-            <span style="font-size:0.85rem;">Confiabilidad de Señal: <b>{calidad['score_confiabilidad_pct']}%</b> | Dictamen: <b>{calidad['dictamen_integridad']}</b> | Síntomas Nórdicos: <b>{res.get('sintomas_nordicos', 'N/A')}</b></span>
+            <span style="font-size:0.85rem;">Confiabilidad de Señal: <b>{calidad['score_confiabilidad_pct']}%</b> | Dictamen: <b>{calidad['dictamen_integridad']}</b> | Muestreo: <b>{res.get('duracion_total_seg', 0)} s</b> | Síntomas Nórdicos: <b>{res.get('sintomas_nordicos', 'N/A')}</b></span>
         </div>
         <div style="font-size:1.15rem; font-weight:800;">
             {calidad['frames_validos_limpios']} / {calidad['total_frames_analizados']} Frames Íntegros
@@ -737,7 +789,7 @@ if st.session_state.get("auditoria_completada", False):
 
     st.markdown(f"### **2. Tablero de Control Dinámico SSO 4.0: `{res['worker_id']}` ({res['session_id']})**")
 
-    # Grid de KPIs Ergonómicos Principales (5 Métricas)
+    # Grid de KPIs Ergonómicos Principales (5 Métricas Sincronizadas)
     kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
     
     with kpi1:
@@ -747,7 +799,7 @@ if st.session_state.get("auditoria_completada", False):
         t_color = "text-danger" if score_val >= 7 else ("text-warning" if score_val >= 5 else "text-success")
         st.markdown(f"""
         <div class="kpi-box {b_color}">
-            <div class="kpi-title">Score Continuo ({res['metodo']})</div>
+            <div class="kpi-title">{res['metodo']} (Oficial: {score_val}/10)</div>
             <div class="kpi-value {t_color}">{score_cont} <span style="font-size:1.1rem; color:#64748B;">/ 10</span></div>
             <div class="kpi-sub {t_color}">{'⚠️ Nivel 3 (Muy Alto)' if score_val>=7 else ('⚡ Nivel 2 (Medio)' if score_val>=5 else '✅ Nivel 1 (Aceptable)')}</div>
         </div>
@@ -790,16 +842,25 @@ if st.session_state.get("auditoria_completada", False):
         """, unsafe_allow_html=True)
 
     with kpi5:
-        pct_est = res.get('pct_tiempo_estatico_riesgo', 0.0)
-        b_color = "border-danger" if pct_est > 30 else ("border-warning" if pct_est > 10 else "border-success")
-        t_color = "text-danger" if pct_est > 30 else ("text-warning" if pct_est > 10 else "text-success")
-        st.markdown(f"""
-        <div class="kpi-box {b_color}">
-            <div class="kpi-title">Carga Estática (ISO 11226)</div>
-            <div class="kpi-value {t_color}">{pct_est}%</div>
-            <div class="kpi-sub">Tiempo en Flexión >20°</div>
-        </div>
-        """, unsafe_allow_html=True)
+        if res.get('miembros_inf_ocluido', False):
+            st.markdown("""
+            <div class="kpi-box border-neutral">
+                <div class="kpi-title">Miembros Inferiores</div>
+                <div class="kpi-value text-neutral" style="font-size:1.35rem; margin-top:6px;">N/D (Ocluido)</div>
+                <div class="kpi-sub text-neutral">Bloqueo por Escritorio</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            pct_est = res.get('pct_tiempo_estatico_riesgo', 0.0)
+            b_color = "border-danger" if pct_est > 30 else ("border-warning" if pct_est > 10 else "border-success")
+            t_color = "text-danger" if pct_est > 30 else ("text-warning" if pct_est > 10 else "text-success")
+            st.markdown(f"""
+            <div class="kpi-box {b_color}">
+                <div class="kpi-title">Carga Estática (ISO 11226)</div>
+                <div class="kpi-value {t_color}">{pct_est}%</div>
+                <div class="kpi-sub">Tiempo en Flexión >20°</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -851,15 +912,16 @@ if st.session_state.get("auditoria_completada", False):
         st.markdown("##### **📑 Interpretación Científica y Fundamentación Biomecánica (SSO 4.0)**")
         
         p_cientificos = generar_analisis_cientifico_graficos(res).split("\n\n")
-        st.info(p_cientificos[0])
-        st.info(p_cientificos)
+        for p_item in p_cientificos:
+            if p_item.strip():
+                st.info(p_item.strip())
 
     with tab3:
         st.markdown("#### **Reporte de Auditoría de Datos y Compuerta de Coherencia**")
         col_m1, col_m2 = st.columns(2)
         with col_m1:
             st.markdown(f"""
-            * **Total de Muestras Cinemáticas:** `{calidad['total_frames_analizados']} fotogramas`
+            * **Duración Total Filmada:** `{res.get('duracion_total_seg', 0.0)} segundos ({calidad['total_frames_analizados']} frames)`
             * **Muestras Válidas Filtradas:** `{calidad['frames_validos_limpios']} fotogramas`
             * **Artefactos / Saltos Descartados:** `{calidad['frames_anomalos_filtrados']} fotogramas`
             * **Carga de Trabajo Evaluada:** `{res.get('peso_carga_evaluado', 'N/A')}`
@@ -869,7 +931,7 @@ if st.session_state.get("auditoria_completada", False):
             st.markdown(f"""
             * **Índice de Confiabilidad Pericial:** **`{calidad['score_confiabilidad_pct']}%`**
             * **Veredicto de Integridad:** `{calidad['dictamen_integridad']}`
-            * **Tasa de Pérdida de Señal:** `{(calidad['frames_anomalos_filtrados']/max(1, calidad['total_frames_analizados'])*100):.2f}%`
+            * **Estado Miembros Inferiores:** `{'No Evaluable (Oclusión por Escritorio)' if res.get('miembros_inf_ocluido') else res.get('miembros_inf_estado', 'Conforme')}`
             * **Síntomas Osteomusculares (Kuorinka):** `{res.get('sintomas_nordicos', 'N/A')}`
             * **Cumplimiento de Privacidad LOPDP:** `{'Activo (Face Blurring)' if res.get('anonimizacion_activa') else 'Registro Directo'}`
             """)
@@ -920,12 +982,13 @@ if st.session_state.get("auditoria_completada", False):
         
         texto_causal_auto = "Se cumplen los 6 criterios del nexo de causalidad bajo Res. C.D. 513 del IESS." if nexo_valido else "Nexo de causalidad sujeto a complementación diagnóstica."
         score_c_txt = f"{res.get('score_continuo', res['score_final'])} / 10"
+        score_oficial_txt = f"{res['metodo']}: {res['score_final']}/10"
         
         analisis_pericial_dinamico = generar_analisis_cientifico_graficos(res)
         
         comentarios_perito = st.text_area(
             "Ingrese notas de campo, detalles del trabajador o recomendaciones específicas para la Sección 6 del PDF oficial:",
-            value=f"Evaluación pericial del puesto {res['worker_id']} ({res['session_id']}). Protocolo: {res['metodo']} (Score Continuo Fuzzy: {score_c_txt}). Síntomas reportados: {res.get('sintomas_nordicos', 'Ninguno')}. {texto_causal_auto}\n\n{analisis_pericial_dinamico}\n\nSe recomienda reajuste ergonómico del puesto de trabajo y seguimiento médico en el SISAT en un plazo no mayor a 30 días.",
+            value=f"Evaluación pericial del puesto {res['worker_id']} ({res['session_id']}). Protocolo: {score_oficial_txt} (Score Continuo Fuzzy: {score_c_txt}). Muestreo: {res.get('duracion_total_seg', 0)} s. Síntomas reportados: {res.get('sintomas_nordicos', 'Ninguno')}. {texto_causal_auto}\n\n{analisis_pericial_dinamico}\n\nSe recomienda reajuste ergonómico del puesto de trabajo y seguimiento médico en el SISAT en un plazo no mayor a 30 días.",
             height=180
         )
         

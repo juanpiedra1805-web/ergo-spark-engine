@@ -7,6 +7,7 @@ import sqlite3
 import cv2
 import pandas as pd
 import numpy as np
+import base64
 
 # Configuración inicial de la página
 st.set_page_config(
@@ -15,6 +16,13 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# 1. Detección automática del Logo Institucional
+LOGO_PATH = None
+for p in ["logo.png", "assets/logo.png", "img/logo.png", "assets/logo.svg", "logo.svg"]:
+    if os.path.exists(p):
+        LOGO_PATH = p
+        break
 
 # Inyección de Estilos CSS Avanzados (Diseño Perceptual y Alta Accesibilidad WCAG AAA)
 st.markdown("""
@@ -25,17 +33,40 @@ st.markdown("""
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     
-    /* Contenedor Superior (Hero Banner) */
+    /* Contenedor Superior (Hero Banner) con Logo */
     .iht-header-container {
         background: linear-gradient(135deg, #0A1E3F 0%, #10376E 50%, #164E96 100%);
-        padding: 26px 32px;
+        padding: 24px 30px;
         border-radius: 14px;
         color: #FFFFFF;
         margin-bottom: 24px;
         box-shadow: 0 6px 20px rgba(10, 30, 63, 0.18);
         border: 1px solid rgba(255, 255, 255, 0.12);
-        position: relative;
-        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+    }
+    
+    .iht-header-content {
+        flex: 1;
+    }
+    
+    .iht-header-logo-box {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 8px 14px;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        max-width: 180px;
+    }
+    
+    .iht-header-logo-box img {
+        max-height: 52px;
+        width: auto;
+        object-fit: contain;
     }
     
     .iht-tagline {
@@ -112,7 +143,6 @@ st.markdown("""
         gap: 4px;
     }
     
-    /* Variantes de Borde y Texto para Niveles de Riesgo */
     .border-danger { border-left: 6px solid #DC2626; }
     .border-warning { border-left: 6px solid #D97706; }
     .border-success { border-left: 6px solid #059669; }
@@ -121,7 +151,6 @@ st.markdown("""
     .text-warning { color: #D97706 !important; }
     .text-success { color: #059669 !important; }
     
-    /* Banner de Calidad y Confiabilidad (Spark Gatekeeper) */
     .quality-banner {
         padding: 16px 22px;
         border-radius: 10px;
@@ -132,25 +161,10 @@ st.markdown("""
         gap: 16px;
     }
     
-    .quality-success {
-        background: #ECFDF5;
-        border: 1px solid #A7F3D0;
-        color: #065F46;
-    }
+    .quality-success { background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; }
+    .quality-warning { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
+    .quality-danger { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; }
     
-    .quality-warning {
-        background: #FFFBEB;
-        border: 1px solid #FDE68A;
-        color: #92400E;
-    }
-    
-    .quality-danger {
-        background: #FEF2F2;
-        border: 1px solid #FECACA;
-        color: #991B1B;
-    }
-    
-    /* Tarjetas de Prescripción de Exoesqueletos */
     .exo-card {
         background: #F8FAFC;
         border: 1px solid #E2E8F0;
@@ -161,23 +175,10 @@ st.markdown("""
         transition: box-shadow 0.2s ease;
     }
     
-    .exo-card:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    }
+    .exo-card:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+    .exo-card h4 { color: #15803D !important; margin: 0 0 8px 0; font-weight: 700; }
+    .exo-card p { margin: 4px 0; font-size: 0.9rem; color: #334155; }
     
-    .exo-card h4 {
-        color: #15803D !important;
-        margin: 0 0 8px 0;
-        font-weight: 700;
-    }
-    
-    .exo-card p {
-        margin: 4px 0;
-        font-size: 0.9rem;
-        color: #334155;
-    }
-    
-    /* Tarjeta informativa de captura */
     .capture-tip-card {
         background: #F1F5F9;
         border-radius: 8px;
@@ -185,34 +186,34 @@ st.markdown("""
         border: 1px solid #CBD5E1;
         margin-bottom: 8px;
     }
-    .capture-tip-title {
-        font-size: 0.85rem;
-        font-weight: 700;
-        color: #1E293B;
-        margin-bottom: 4px;
-    }
-    .capture-tip-desc {
-        font-size: 0.8rem;
-        color: #475569;
-        margin: 0;
-        line-height: 1.35;
-    }
+    .capture-tip-title { font-size: 0.85rem; font-weight: 700; color: #1E293B; margin-bottom: 4px; }
+    .capture-tip-desc { font-size: 0.8rem; color: #475569; margin: 0; line-height: 1.35; }
 </style>
 """, unsafe_allow_html=True)
 
-# Encabezado Principal (Hero Banner)
-st.markdown("""
+# 2. Renderizado del Encabezado Principal con Logo
+if LOGO_PATH:
+    with open(LOGO_PATH, "rb") as img_file:
+        b64_logo = base64.b64encode(img_file.read()).decode("utf-8")
+    logo_mime = "image/svg+xml" if LOGO_PATH.endswith(".svg") else "image/png"
+    logo_html = f'<div class="iht-header-logo-box"><a href="https://www.ih-t.net" target="_blank"><img src="data:{logo_mime};base64,{b64_logo}" alt="IH&T Services"></a></div>'
+else:
+    logo_html = '<div class="iht-header-logo-box" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25);"><a href="https://www.ih-t.net" target="_blank" style="text-decoration:none; color:#FFFFFF; font-weight:800; font-size:1.15rem; letter-spacing:0.05em;">IH&T</a></div>'
+
+st.markdown(f"""
 <div class="iht-header-container">
-    <div class="iht-tagline">🛡️ SISTEMA INTEGRAL DE AUDITORÍA OCUPACIONAL</div>
-    <div class="iht-title">IH&T Services — Ergonomía & Biomecánica 4.0</div>
-    <div class="iht-subtitle">Plataforma Unificada bajo D.E. 255, Anexo 3 MDT y Acuerdo MSP 00004-2026 (SISAT).</div>
+    <div class="iht-header-content">
+        <div class="iht-tagline">🛡️ SISTEMA INTEGRAL DE AUDITORÍA OCUPACIONAL</div>
+        <div class="iht-title">IH&T Services — Ergonomía & Biomecánica 4.0</div>
+        <div class="iht-subtitle">Plataforma Unificada bajo D.E. 255, Anexo 3 MDT y Acuerdo MSP 00004-2026 (SISAT).</div>
+    </div>
+    {logo_html}
 </div>
 """, unsafe_allow_html=True)
 
-# Sección de Carga
+# 3. Sección de Carga
 st.markdown("#### **1. Carga de Registro Fílmico para Auditoría**")
 
-# Guía técnica de captura para optimizar el análisis pericial (Empty State Guidance)
 with st.expander("ℹ️ Criterios técnicos de captura recomendados para el análisis cinemático", expanded=False):
     g1, g2, g3 = st.columns(3)
     with g1:
@@ -251,10 +252,14 @@ if uploaded_file is not None:
         st.session_state["auditoria_completada"] = False
         st.session_state["last_uploaded_name"] = uploaded_file.name
 
-# Barra Lateral (Configuración y Marco Legal)
+# 4. Barra Lateral con Logo Integrado y Marco Legal
 with st.sidebar:
-    st.markdown("### **IH&T Services**")
-    st.caption("Industrial Hygiene & Occupational Health Consulting")
+    if LOGO_PATH:
+        st.image(LOGO_PATH, use_container_width=True)
+    else:
+        st.markdown("### **IH&T Services**")
+        st.caption("Industrial Hygiene & Occupational Health Consulting")
+    
     st.markdown("---")
     
     st.markdown("#### **Parámetros del Dictamen**")
@@ -291,9 +296,9 @@ with st.sidebar:
 - **ISO 11226 / ISO 9241-5:** Biomecánica y PVD.
 """)
     st.markdown("---")
-    st.caption("🌐 [www.ih-t.net](https://www.ih-t.net)")
+    st.markdown("[🌐 www.ih-t.net](https://www.ih-t.net)", unsafe_allow_html=True)
 
-# Ejecución del Pipeline Biomecánico
+# 5. Ejecución del Pipeline Biomecánico
 if uploaded_file is not None:
     col_btn, col_info = st.columns([1.5, 3])
     with col_btn:
@@ -302,7 +307,6 @@ if uploaded_file is not None:
         st.caption(f"📁 **Archivo:** `{uploaded_file.name}` ({uploaded_file.size / (1024*1024):.1f} MB) | Listo para análisis.")
 
     if ejecutar_btn:
-        # Importación diferida de módulos del pipeline
         from src.extractor import procesar_video
         from src.classifier import clasificar_puesto_automaticamente
         from src.reporter import planificar_evidencias, generar_dictamen_ergonomico
@@ -413,7 +417,7 @@ if uploaded_file is not None:
                     except Exception:
                         pass
 
-# Panel de Resultados y Visualización Forense
+# 6. Panel de Resultados y Visualización Forense
 if st.session_state.get("auditoria_completada", False):
     res = st.session_state["resumen_dict"]
     plan = st.session_state["plan"]
@@ -425,7 +429,6 @@ if st.session_state.get("auditoria_completada", False):
 
     st.markdown("---")
     
-    # Sello de Calidad y Confiabilidad
     q_class = f"quality-{calidad['color_badge']}"
     st.markdown(f"""
     <div class="quality-banner {q_class}">
@@ -441,7 +444,6 @@ if st.session_state.get("auditoria_completada", False):
 
     st.markdown(f"### **2. Tablero de Control: `{res['worker_id']}` ({res['session_id']})**")
 
-    # Grid de KPIs Ergonómicos Principales
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
     
     with kpi1:
@@ -494,7 +496,6 @@ if st.session_state.get("auditoria_completada", False):
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Pestañas de Análisis Detallado
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📸 Evidencias Cinemáticas 3D", 
         "📊 Distribución Postural (ISO 11226)", 

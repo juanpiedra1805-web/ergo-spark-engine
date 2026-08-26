@@ -43,10 +43,11 @@ def calcular_angulo_2d(p1, p2, p3):
     return float(np.degrees(np.arccos(np.clip(cos_ang, -1.0, 1.0))))
 
 def computar_angulos_completos_2d(c7, r_ear, nose, r_hip, r_sh, r_elb, r_wri, r_ind, r_knee, r_ank):
-    """Calcula los 5 ángulos posturales principales del puesto de trabajo."""
-    # 1. Tronco: C7 a Cadera respecto a la vertical
-    v_torso = np.array(c7) - np.array(r_hip)
+    """Calcula los 5 ángulos posturales principales del puesto de trabajo con alta fidelidad anatómica."""
     v_vert = np.array([0.0, -1.0])
+    
+    # 1. Tronco: Vector real de Cadera a C7 respecto a la vertical
+    v_torso = np.array(c7) - np.array(r_hip)
     n_torso = np.linalg.norm(v_torso)
     if n_torso > 0:
         cos_t = np.dot(v_torso, v_vert) / n_torso
@@ -54,8 +55,8 @@ def computar_angulos_completos_2d(c7, r_ear, nose, r_hip, r_sh, r_elb, r_wri, r_
     else:
         ang_tronco = 0.0
         
-    # 2. Cuello: C7 a Nariz respecto a la vertical
-    v_cuello = np.array(nose) - np.array(c7)
+    # 2. Cuello: Vector real de C7 a Oreja (Cervical-Cefálico) respecto a la vertical
+    v_cuello = np.array(r_ear) - np.array(c7)
     n_cuello = np.linalg.norm(v_cuello)
     if n_cuello > 0:
         cos_c = np.dot(v_cuello, v_vert) / n_cuello
@@ -63,7 +64,7 @@ def computar_angulos_completos_2d(c7, r_ear, nose, r_hip, r_sh, r_elb, r_wri, r_
     else:
         ang_cuello = 0.0
         
-    # 3. Brazo: Hombro-Codo respecto a la línea del torso
+    # 3. Brazo: Hombro-Codo respecto al eje del torso
     ang_brazo = float(calcular_angulo_2d(r_hip, r_sh, r_elb))
     
     # 4. Muñeca: Codo-Muñeca-Índice
@@ -79,8 +80,7 @@ def computar_angulos_completos_2d(c7, r_ear, nose, r_hip, r_sh, r_elb, r_wri, r_
 
 def procesar_video(video_path: str, output_parquet_path: str = None, session_id: str = "SES-001", worker_id: str = "OPERARIO"):
     """
-    Extrae landmarks articulares y calcula la telemetría biomecánica continua.
-    Garantiza todas las columnas para compatibilidad absoluta con visualizer y analytics.
+    Extrae landmarks articulares y calcula la telemetría biomecánica continua sin sesgos de verticalidad.
     """
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
@@ -108,7 +108,7 @@ def procesar_video(video_path: str, output_parquet_path: str = None, session_id:
             
         h, w, _ = frame.shape
         
-        # Valores de contingencia para evitar fallos de renderizado
+        # Valores de contingencia iniciales
         nose = np.array([w * 0.5, h * 0.2])
         r_ear = np.array([w * 0.48, h * 0.18])
         r_sh = np.array([w * 0.45, h * 0.3])
@@ -139,14 +139,13 @@ def procesar_video(video_path: str, output_parquet_path: str = None, session_id:
                 r_elb = np.array([lm[mp_pose.PoseLandmark.RIGHT_ELBOW].x * w, lm[mp_pose.PoseLandmark.RIGHT_ELBOW].y * h])
                 r_wri = np.array([lm[mp_pose.PoseLandmark.RIGHT_WRIST].x * w, lm[mp_pose.PoseLandmark.RIGHT_WRIST].y * h])
                 r_ind = np.array([lm[mp_pose.PoseLandmark.RIGHT_INDEX].x * w, lm[mp_pose.PoseLandmark.RIGHT_INDEX].y * h])
+                
+                # Asignación directa de la cadera real detectada (sin sesgos artificiales de verticalidad)
                 raw_hip = np.array([lm[mp_pose.PoseLandmark.RIGHT_HIP].x * w, lm[mp_pose.PoseLandmark.RIGHT_HIP].y * h])
+                r_hip = raw_hip
                 
                 dir_frente = 1.0 if (nose[0] - c7[0]) >= 0 else -1.0
                 len_torso = np.linalg.norm(c7 - raw_hip)
-                
-                hip_x = raw_hip[0] - (len_torso * 0.05 * dir_frente)
-                hip_y = raw_hip[1] + (len_torso * 0.28)
-                r_hip = np.array([hip_x, hip_y])
                 
                 raw_ank = np.array([lm[mp_pose.PoseLandmark.RIGHT_ANKLE].x * w, lm[mp_pose.PoseLandmark.RIGHT_ANKLE].y * h])
                 vis_ank = lm[mp_pose.PoseLandmark.RIGHT_ANKLE].visibility
@@ -166,8 +165,8 @@ def procesar_video(video_path: str, output_parquet_path: str = None, session_id:
                     es_ocluido = 0
                     estado_postura = "APOYO PLANTAR (GROUNDING)"
                     len_femur = max(45.0, len_torso * 0.75)
-                    knee_x = hip_x + (len_femur * dir_frente)
-                    knee_y = hip_y + (len_femur * 0.05)
+                    knee_x = r_hip[0] + (len_femur * dir_frente)
+                    knee_y = r_hip[1] + (len_femur * 0.05)
                     r_knee = np.array([knee_x, knee_y])
                     
                     len_tibia = max(55.0, len_torso * 1.05)

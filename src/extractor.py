@@ -155,15 +155,19 @@ def procesar_video(video_path: str, output_parquet_path: str = None, session_id:
                 dir_frente = 1.0 if (nose[0] - c7[0]) >= 0 else -1.0
                 len_torso = np.linalg.norm(c7 - raw_hip)
                 
+                raw_knee = np.array([lm[mp_pose.PoseLandmark.RIGHT_KNEE].x * w, lm[mp_pose.PoseLandmark.RIGHT_KNEE].y * h])
+                vis_knee = lm[mp_pose.PoseLandmark.RIGHT_KNEE].visibility
                 raw_ank = np.array([lm[mp_pose.PoseLandmark.RIGHT_ANKLE].x * w, lm[mp_pose.PoseLandmark.RIGHT_ANKLE].y * h])
                 vis_ank = lm[mp_pose.PoseLandmark.RIGHT_ANKLE].visibility
+                raw_toe = np.array([lm[mp_pose.PoseLandmark.RIGHT_FOOT_INDEX].x * w, lm[mp_pose.PoseLandmark.RIGHT_FOOT_INDEX].y * h])
+                vis_toe = lm[mp_pose.PoseLandmark.RIGHT_FOOT_INDEX].visibility
                 
                 es_alucinacion = False
                 if dir_frente == 1.0 and raw_ank[0] > r_wri[0]: es_alucinacion = True
                 if dir_frente == -1.0 and raw_ank[0] < r_wri[0]: es_alucinacion = True
                 if raw_ank[1] < r_hip[1]: es_alucinacion = True
                     
-                if vis_ank < 0.35 or es_alucinacion:
+                if vis_ank < 0.35 or vis_knee < 0.35 or es_alucinacion:
                     es_ocluido = 1
                     estado_postura = "OCLUSION POR ESCRITORIO"
                     r_knee = np.array([0.0, 0.0])
@@ -172,18 +176,10 @@ def procesar_video(video_path: str, output_parquet_path: str = None, session_id:
                 else:
                     es_ocluido = 0
                     estado_postura = "APOYO PLANTAR (GROUNDING)"
-                    len_femur = max(45.0, len_torso * 0.75)
-                    knee_x = r_hip[0] + (len_femur * dir_frente)
-                    knee_y = r_hip[1] + (len_femur * 0.05)
-                    r_knee = np.array([knee_x, knee_y])
-                    
-                    len_tibia = max(55.0, len_torso * 1.05)
-                    ank_x = knee_x - (len_tibia * 0.02 * dir_frente)
-                    ank_y = knee_y + len_tibia
-                    r_ank = np.array([ank_x, ank_y])
-                    
-                    len_pie = max(20.0, len_torso * 0.35)
-                    r_toe = np.array([ank_x + (len_pie * dir_frente), ank_y])
+                    # Landmarks reales de MediaPipe (medidos, no estimados por proporción antropométrica)
+                    r_knee = raw_knee
+                    r_ank = raw_ank
+                    r_toe = raw_toe if vis_toe >= 0.35 else np.array([raw_ank[0] + (20.0 * dir_frente), raw_ank[1]])
 
         at, ac, ab, am, arod = computar_angulos_completos_2d(c7, r_ear, nose, r_hip, r_sh, r_elb, r_wri, r_ind, r_knee, r_ank)
         

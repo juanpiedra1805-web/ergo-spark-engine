@@ -30,76 +30,13 @@ for p in ["logo.png", "assets/logo.png", "img/logo.png", "assets/logo.svg", "log
         LOGO_PATH = p
         break
 
-# --- COMPONENTE DE AUTENTICACIÓN Y CONTROL DE ACCESO (GATEKEEPER) ---
-
-def verificar_credenciales(usuario, password):
-    """
-    Verifica las credenciales contra st.secrets o contraseñas autorizadas.
-    """
-    if hasattr(st, "secrets") and "passwords" in st.secrets:
-        if usuario in st.secrets["passwords"] and str(st.secrets["passwords"][usuario]) == str(password):
-            return True
-            
-    credenciales_iht = {
-        "admin": "IHT_Ergo2026*",
-        "perito": "Perito_SST2026",
-        "jp_piedra": "Ergo4.0_2026"
-    }
-    return usuario in credenciales_iht and credenciales_iht[usuario] == password
-
-def render_login():
-    """
-    Pantalla de autenticación previa al acceso de la suite forense.
-    """
-    col1, col2, col3 = st.columns()
-    with col2:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        
-        if LOGO_PATH:
-            with open(LOGO_PATH, "rb") as img_file:
-                b64_logo = base64.b64encode(img_file.read()).decode("utf-8")
-            logo_mime = "image/svg+xml" if LOGO_PATH.endswith(".svg") else "image/png"
-            st.markdown(f'<div style="text-align:center; margin-bottom:15px;"><img src="data:{logo_mime};base64,{b64_logo}" style="max-height:60px;"></div>', unsafe_allow_html=True)
-            
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #0A1E3F 0%, #164E96 100%); padding: 22px 26px; border-radius: 12px 12px 0 0; color: #FFFFFF; text-align: center;">
-            <div style="font-size:0.75rem; font-weight:700; letter-spacing:0.06em; color:#93C5FD; text-transform:uppercase; margin-bottom:4px;">🛡️ Control de Acceso Pericial</div>
-            <h3 style="margin:0; font-size:1.4rem; font-weight:800; color:#FFFFFF;">IH&T Services — Ergonomía 4.0</h3>
-            <p style="margin:4px 0 0 0; font-size:0.85rem; color:#E2E8F0;">Plataforma Forense bajo D.E. 255 y Acuerdo MSP 00004-2026</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        with st.form("login_form"):
-            st.markdown("<br>", unsafe_allow_html=True)
-            usuario_in = st.text_input("👤 Usuario / Perito Evaluador", placeholder="Ej. jp_piedra")
-            password_in = st.text_input("🔑 Contraseña", type="password", placeholder="••••••••")
-            submit_btn = st.form_submit_button("Ingresar a la Plataforma", type="primary", use_container_width=True)
-            
-            if submit_btn:
-                if verificar_credenciales(usuario_in.strip(), password_in.strip()):
-                    st.session_state["autenticado"] = True
-                    st.session_state["usuario_actual"] = usuario_in.strip()
-                    st.success("✅ Acceso autorizado. Iniciando suite...")
-                    st.rerun()
-                else:
-                    st.error("❌ Usuario o contraseña incorrectos. Verifique sus credenciales.")
-                    
-        st.markdown("<div style='text-align:center; font-size:0.78rem; color:#64748B; margin-top:10px;'>Acceso exclusivo para personal autorizado de <b>IH&T Services</b>. Conforme a la Ley Orgánica de Protección de Datos Personales (LOPDP).</div>", unsafe_allow_html=True)
-if "autenticado" not in st.session_state:
-    st.session_state["autenticado"] = False
-    st.session_state["usuario_actual"] = ""
-
-if not st.session_state["autenticado"]:
-    render_login()
-    st.stop()
-
-# ==============================================================================
-# A PARTIR DE AQUÍ: SUITE DE ERGONOMÍA FORENSE 4.0 (ACCESO AUTORIZADO)
-# ==============================================================================
-
 # --- Módulos de Cálculo, Telemetría y Análisis Científico SSO 4.0 ---
 
 def calcular_fuzzy_score_continuo(t_p50, c_p50, b_p50, m_p50, metodo="ROSA", bonus_carga=0, bonus_agarre=0):
+    """
+    Calcula un puntaje continuo utilizando lógica difusa (Fuzzy REBA/ROSA)
+    para evitar discontinuidades y saltos de escala en las fronteras angulares (SSO 4.0).
+    """
     if t_p50 <= 0:
         s_t = 1.0
     elif t_p50 <= 20.0:
@@ -136,6 +73,9 @@ def calcular_fuzzy_score_continuo(t_p50, c_p50, b_p50, m_p50, metodo="ROSA", bon
     return score_calc
 
 def generar_boxplot_ergonomico_seguro(pdf_continuous, boxplot_path, worker_id, metodo):
+    """
+    Genera de forma infalible el diagrama de cajas y bigotes con bandas de aceptabilidad ISO 11226.
+    """
     os.makedirs(os.path.dirname(boxplot_path), exist_ok=True)
     try:
         from src.analytics import generar_boxplot_ergonomico
@@ -211,6 +151,9 @@ def generar_boxplot_ergonomico_seguro(pdf_continuous, boxplot_path, worker_id, m
         plt.close(fig)
 
 def generar_grafico_dosis_temporal(df_continuous, fps, output_path, worker_id):
+    """
+    Genera la curva de cinemática continua y fatiga acumulada a lo largo del tiempo (SSO 4.0).
+    """
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9.5, 6.2), dpi=300, sharex=True)
     
@@ -248,6 +191,10 @@ def generar_grafico_dosis_temporal(df_continuous, fps, output_path, worker_id):
     plt.close(fig)
 
 def generar_analisis_cientifico_graficos(res):
+    """
+    Genera dinámicamente dos párrafos de análisis pericial-científico en texto plano limpio
+    (sin código LaTeX ni caracteres rotos) fundamentados en la telemetría real y citando la literatura clave.
+    """
     metodo = res.get('metodo', 'ROSA')
     worker_id = res.get('worker_id', 'OPERARIO')
     t_p50 = res.get('tronco_p50_deg', 0.0)
@@ -292,7 +239,7 @@ def generar_analisis_cientifico_graficos(res):
 
     return f"{p1}\n\n{p2}"
 
-# Inyección de Estilos CSS Avanzados
+# Inyección de Estilos CSS Avanzados (Diseño Perceptual y Alta Accesibilidad WCAG AAA)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -522,7 +469,7 @@ if uploaded_file is not None:
         st.session_state["auditoria_completada"] = False
         st.session_state["last_uploaded_name"] = uploaded_file.name
 
-# 4. Barra Lateral con Parámetros Avanzados y Control de Sesión
+# 4. Barra Lateral con Parámetros Avanzados, Variables de Carga, Síntomas y Privacidad LOPDP
 with st.sidebar:
     if LOGO_PATH:
         st.image(LOGO_PATH, use_container_width=True)
@@ -530,14 +477,6 @@ with st.sidebar:
         st.markdown("### **IH&T Services**")
         st.caption("Industrial Hygiene & Occupational Health Consulting")
     
-    # Control de Sesión Activa
-    user_actual = st.session_state.get("usuario_actual", "Perito")
-    st.markdown(f"👤 **Sesión Activa:** `{user_actual}`")
-    if st.button("🚪 Cerrar Sesión", use_container_width=True):
-        st.session_state["autenticado"] = False
-        st.session_state["usuario_actual"] = ""
-        st.rerun()
-
     st.markdown("---")
     
     st.markdown("#### **Parámetros del Dictamen**")
@@ -692,7 +631,6 @@ if uploaded_file is not None:
                 resumen_dict = {
                     "session_id": session_id,
                     "worker_id": worker_id,
-                    "perito_evaluador": user_actual,
                     "metodo": metodo_seleccionado,
                     "score_final": score_final,
                     "score_continuo": score_continuo,
@@ -733,6 +671,7 @@ if uploaded_file is not None:
                 st.write("🔹 **Fase 6/6:** Redactando dictamen técnico estructurado y análisis científico...")
                 informe_md = generar_dictamen_ergonomico(resumen_dict, plan, metodo_seleccionado, f"img/{worker_id}")
                 
+                # Integración automática de los dos párrafos de fundamentación científica en el informe MD
                 analisis_cientifico_puros = generar_analisis_cientifico_graficos(resumen_dict)
                 resumen_dict["analisis_cientifico_txt"] = analisis_cientifico_puros
                 
@@ -788,7 +727,7 @@ if st.session_state.get("auditoria_completada", False):
     <div class="quality-banner {q_class}">
         <div>
             <b>🛡️ SELLO DE AUDITORÍA Y CONTROL DE CALIDAD BIOMECÁNICA (SPARK GATEKEEPER)</b><br>
-            <span style="font-size:0.85rem;">Perito: <b>{res.get('perito_evaluador', 'N/A')}</b> | Confiabilidad: <b>{calidad['score_confiabilidad_pct']}%</b> | Dictamen: <b>{calidad['dictamen_integridad']}</b> | Síntomas Nórdicos: <b>{res.get('sintomas_nordicos', 'N/A')}</b></span>
+            <span style="font-size:0.85rem;">Confiabilidad de Señal: <b>{calidad['score_confiabilidad_pct']}%</b> | Dictamen: <b>{calidad['dictamen_integridad']}</b> | Síntomas Nórdicos: <b>{res.get('sintomas_nordicos', 'N/A')}</b></span>
         </div>
         <div style="font-size:1.15rem; font-weight:800;">
             {calidad['frames_validos_limpios']} / {calidad['total_frames_analizados']} Frames Íntegros
@@ -912,16 +851,14 @@ if st.session_state.get("auditoria_completada", False):
         st.markdown("##### **📑 Interpretación Científica y Fundamentación Biomecánica (SSO 4.0)**")
         
         p_cientificos = generar_analisis_cientifico_graficos(res).split("\n\n")
-        for p_item in p_cientificos:
-            if p_item.strip():
-                st.info(p_item.strip())
+        st.info(p_cientificos[0])
+        st.info(p_cientificos)
 
     with tab3:
         st.markdown("#### **Reporte de Auditoría de Datos y Compuerta de Coherencia**")
         col_m1, col_m2 = st.columns(2)
         with col_m1:
             st.markdown(f"""
-            * **Perito Evaluador Autenticado:** `{res.get('perito_evaluador', 'N/A')}`
             * **Total de Muestras Cinemáticas:** `{calidad['total_frames_analizados']} fotogramas`
             * **Muestras Válidas Filtradas:** `{calidad['frames_validos_limpios']} fotogramas`
             * **Artefactos / Saltos Descartados:** `{calidad['frames_anomalos_filtrados']} fotogramas`
@@ -988,7 +925,7 @@ if st.session_state.get("auditoria_completada", False):
         
         comentarios_perito = st.text_area(
             "Ingrese notas de campo, detalles del trabajador o recomendaciones específicas para la Sección 6 del PDF oficial:",
-            value=f"Evaluación pericial del puesto {res['worker_id']} ({res['session_id']}). Perito: {res.get('perito_evaluador', 'N/A')}. Protocolo: {res['metodo']} (Score Continuo Fuzzy: {score_c_txt}). Síntomas reportados: {res.get('sintomas_nordicos', 'Ninguno')}. {texto_causal_auto}\n\n{analisis_pericial_dinamico}\n\nSe recomienda reajuste ergonómico del puesto de trabajo y seguimiento médico en el SISAT en un plazo no mayor a 30 días.",
+            value=f"Evaluación pericial del puesto {res['worker_id']} ({res['session_id']}). Protocolo: {res['metodo']} (Score Continuo Fuzzy: {score_c_txt}). Síntomas reportados: {res.get('sintomas_nordicos', 'Ninguno')}. {texto_causal_auto}\n\n{analisis_pericial_dinamico}\n\nSe recomienda reajuste ergonómico del puesto de trabajo y seguimiento médico en el SISAT en un plazo no mayor a 30 días.",
             height=180
         )
         

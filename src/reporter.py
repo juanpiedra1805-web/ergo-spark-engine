@@ -33,7 +33,11 @@ def generar_dictamen_ergonomico(metricas: dict, plan: list, metodo: str = "ROSA"
     c_p10, c_p50, c_p95 = metricas.get('cuello_p10_deg', 0.0), metricas.get('cuello_p50_deg', 0.0), metricas.get('cuello_p95_deg', 0.0)
     b_p10, b_p50, b_p95 = metricas.get('brazo_p10_deg', 0.0), metricas.get('brazo_p50_deg', 0.0), metricas.get('brazo_p95_deg', 0.0)
     m_p10, m_p50, m_p95 = metricas.get('muneca_p10_deg', 8.1), metricas.get('muneca_p50_deg', 13.8), metricas.get('muneca_p95_deg', 23.0)
-    r_p10, r_p50, r_p95 = metricas.get('rodilla_p10_deg', 88.0), metricas.get('rodilla_p50_deg', 92.4), metricas.get('rodilla_p95_deg', 96.2)
+    inf_ocluido = bool(metricas.get('miembros_inf_ocluido', False))
+    r_p10 = metricas.get('miembros_inf_p10', 'N/D')
+    r_p50_raw = metricas.get('miembros_inf_p50', 'N/D')
+    r_p95 = metricas.get('miembros_inf_p95', 'N/D')
+    r_p50 = None if inf_ocluido else float(str(r_p50_raw).replace('°', ''))
 
     es_rosa = metodo.upper() == "ROSA"
     puesto_tipo = "Puesto de Trabajo con Pantallas de Visualización de Datos (PVD / Terminal Portátil)" if es_rosa else "Puesto Operativo Industrial / Carga Física y Posturas Forzadas"
@@ -43,7 +47,7 @@ def generar_dictamen_ergonomico(metricas: dict, plan: list, metodo: str = "ROSA"
     conf_cuello = "CONFORME (< 25°)" if c_p50 <= 25.0 else (f"ALERTA (P50: {c_p50}°)" if c_p50 <= 35.0 else f"NO CONFORME — Flexión Severa (P50: {c_p50}° > 35°)")
     conf_brazo = "CONFORME (< 20°)" if b_p50 <= 20.0 else (f"ALERTA — Elevación Sin Soporte (P50: {b_p50}°)" if b_p50 <= 45.0 else f"NO CONFORME (P50: {b_p50}° > 45°)")
     conf_muneca = "CONFORME (< 15°)" if m_p50 <= 15.0 else (f"ALERTA — Desviación en Periférico (P50: {m_p50}°)" if m_p50 <= 25.0 else f"NO CONFORME (P50: {m_p50}° > 25°)")
-    conf_rodilla = "CONFORME (80°-100°)" if (80.0 <= r_p50 <= 100.0) else "ALERTA — Reajustar Altura / Grounding"
+    conf_rodilla = "NO EVALUABLE (Oclusión por Escritorio — Sin Imputación Artificial)" if inf_ocluido else ("CONFORME (80°-100°)" if (80.0 <= r_p50 <= 100.0) else "ALERTA — Reajustar Altura / Grounding")
 
     diagnostico = diagnosticar_intervencion_cientifica(metricas, metodo)
 
@@ -151,7 +155,7 @@ A continuación se presentan los registros fotográficos de alta fidelidad con a
 | **Columna Cervical (C7-Cara)** | {c_p10}° | **{c_p50}°** | **{c_p95}°** | < 25.0° (Zona Aceptable) | **{conf_cuello}** |
 | **Miembros Superiores (Brazo)** | {b_p10}° | **{b_p50}°** | **{b_p95}°** | < 20.0° (Zona de Confort) | **{conf_brazo}** |
 | **Muñeca / Mano** | {m_p10}° | **{m_p50}°** | **{m_p95}°** | < 15.0° (Zona de Confort) | **{conf_muneca}** |
-| **Miembros Inferiores (Rodilla)** | {r_p10}° | **{r_p50}°** | **{r_p95}°** | 80.0° - 100.0° (Ángulo Poplíteo) | **{conf_rodilla}** |
+| **Miembros Inferiores (Rodilla)** | {r_p10} | **{r_p50_raw}** | **{r_p95}** | 80.0° - 100.0° (Ángulo Poplíteo) | **{conf_rodilla}** |
 
 ---
 

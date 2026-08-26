@@ -785,6 +785,19 @@ if uploaded_file is not None:
 
                 pdf_continuous, met_calidad = validar_coherencia_pandas(df_raw)
 
+                # Corrección defensiva estricta para garantizar compatibilidad con visualizer.py
+                if "frame_index" not in pdf_continuous.columns:
+                    if "frame" in pdf_continuous.columns:
+                        pdf_continuous["frame_index"] = pdf_continuous["frame"]
+                    elif "frame_idx" in pdf_continuous.columns:
+                        pdf_continuous["frame_index"] = pdf_continuous["frame_idx"]
+                    elif "frame_id" in pdf_continuous.columns:
+                        pdf_continuous["frame_index"] = pdf_continuous["frame_id"]
+                    else:
+                        pdf_continuous["frame_index"] = np.arange(len(pdf_continuous))
+                if "frame" not in pdf_continuous.columns:
+                    pdf_continuous["frame"] = pdf_continuous["frame_index"]
+
                 t_clean = pdf_continuous["ang_tronco"].values
                 c_clean = pdf_continuous["ang_cuello"].values
                 b_clean = pdf_continuous["ang_brazo_der"].values

@@ -8,6 +8,7 @@ import cv2
 import pandas as pd
 import numpy as np
 
+# Configuración inicial de la página
 st.set_page_config(
     page_title="IH&T Services | Suite de Ergonomía Forense 4.0",
     page_icon="🛡️",
@@ -15,90 +16,231 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-from src.extractor import procesar_video
-from src.classifier import clasificar_puesto_automaticamente
-from src.reporter import planificar_evidencias, generar_dictamen_ergonomico
-from src.visualizer import extraer_candidatos_para_gemini, renderizar_imagenes_segun_instrucciones
-from src.analytics import inicializar_y_guardar_bd, generar_boxplot_ergonomico
-from src.science_engine import diagnosticar_intervencion_cientifica
-from src.pdf_generator import generar_pdf_pericial
-from src.kinematics import calcular_matriz_rosa_oficial
-from src.coherence_validator import validar_coherencia_pandas
-
+# Inyección de Estilos CSS Avanzados (Diseño Perceptual y Alta Accesibilidad WCAG AAA)
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    /* Contenedor Superior (Hero Banner) */
     .iht-header-container {
-        background: linear-gradient(135deg, #0B2545 0%, #133E87 100%);
-        padding: 24px 30px;
-        border-radius: 12px;
+        background: linear-gradient(135deg, #0A1E3F 0%, #10376E 50%, #164E96 100%);
+        padding: 26px 32px;
+        border-radius: 14px;
         color: #FFFFFF;
-        margin-bottom: 25px;
-        box-shadow: 0 4px 15px rgba(11, 37, 69, 0.15);
+        margin-bottom: 24px;
+        box-shadow: 0 6px 20px rgba(10, 30, 63, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        position: relative;
+        overflow: hidden;
     }
-    .iht-title { font-size: 1.85rem; font-weight: 700; color: #FFFFFF; margin-bottom: 4px; }
-    .iht-subtitle { font-size: 0.95rem; color: #93C5FD; }
+    
     .iht-tagline {
-        display: inline-block;
-        background: rgba(255, 255, 255, 0.12);
-        padding: 3px 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.14);
+        padding: 4px 12px;
         border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
-        margin-bottom: 8px;
-        color: #60A5FA;
+        margin-bottom: 10px;
+        color: #93C5FD;
+        border: 1px solid rgba(147, 197, 253, 0.25);
     }
+    
+    .iht-title {
+        font-size: 1.85rem;
+        font-weight: 800;
+        color: #FFFFFF !important;
+        margin: 0 0 6px 0;
+        letter-spacing: -0.025em;
+        line-height: 1.2;
+    }
+    
+    .iht-subtitle {
+        font-size: 0.95rem;
+        color: #E2E8F0;
+        margin: 0;
+        font-weight: 400;
+        line-height: 1.4;
+    }
+    
+    /* Tarjetas de Métricas (KPIs) */
     .kpi-box {
         background: #FFFFFF;
         border: 1px solid #E2E8F0;
-        border-radius: 10px;
-        padding: 18px 20px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+        border-radius: 12px;
+        padding: 20px 22px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        height: 100%;
     }
-    .kpi-title { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; color: #64748B; margin-bottom: 6px; }
-    .kpi-value { font-size: 2.1rem; font-weight: 700; line-height: 1.1; margin-bottom: 6px; }
-    .kpi-sub { font-size: 0.8rem; font-weight: 500; }
-    .border-danger { border-left: 5px solid #DC2626; }
-    .border-warning { border-left: 5px solid #D97706; }
-    .border-success { border-left: 5px solid #0D9488; }
-    .text-danger { color: #DC2626; }
-    .text-warning { color: #D97706; }
-    .text-success { color: #0D9488; }
+    
+    .kpi-box:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    }
+    
+    .kpi-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748B;
+        margin-bottom: 8px;
+    }
+    
+    .kpi-value {
+        font-size: 2.2rem;
+        font-weight: 800;
+        line-height: 1.1;
+        margin-bottom: 8px;
+        letter-spacing: -0.02em;
+    }
+    
+    .kpi-sub {
+        font-size: 0.82rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    /* Variantes de Borde y Texto para Niveles de Riesgo */
+    .border-danger { border-left: 6px solid #DC2626; }
+    .border-warning { border-left: 6px solid #D97706; }
+    .border-success { border-left: 6px solid #059669; }
+    
+    .text-danger { color: #DC2626 !important; }
+    .text-warning { color: #D97706 !important; }
+    .text-success { color: #059669 !important; }
+    
+    /* Banner de Calidad y Confiabilidad (Spark Gatekeeper) */
     .quality-banner {
-        padding: 14px 18px;
-        border-radius: 8px;
-        margin-bottom: 20px;
+        padding: 16px 22px;
+        border-radius: 10px;
+        margin-bottom: 24px;
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 16px;
     }
-    .quality-success { background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; }
-    .quality-warning { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
-    .quality-danger { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; }
+    
+    .quality-success {
+        background: #ECFDF5;
+        border: 1px solid #A7F3D0;
+        color: #065F46;
+    }
+    
+    .quality-warning {
+        background: #FFFBEB;
+        border: 1px solid #FDE68A;
+        color: #92400E;
+    }
+    
+    .quality-danger {
+        background: #FEF2F2;
+        border: 1px solid #FECACA;
+        color: #991B1B;
+    }
+    
+    /* Tarjetas de Prescripción de Exoesqueletos */
     .exo-card {
         background: #F8FAFC;
         border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        padding: 18px 20px;
+        margin-bottom: 14px;
+        border-left: 5px solid #16A34A;
+        transition: box-shadow 0.2s ease;
+    }
+    
+    .exo-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    
+    .exo-card h4 {
+        color: #15803D !important;
+        margin: 0 0 8px 0;
+        font-weight: 700;
+    }
+    
+    .exo-card p {
+        margin: 4px 0;
+        font-size: 0.9rem;
+        color: #334155;
+    }
+    
+    /* Tarjeta informativa de captura */
+    .capture-tip-card {
+        background: #F1F5F9;
         border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 12px;
+        padding: 14px 16px;
+        border: 1px solid #CBD5E1;
+        margin-bottom: 8px;
+    }
+    .capture-tip-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #1E293B;
+        margin-bottom: 4px;
+    }
+    .capture-tip-desc {
+        font-size: 0.8rem;
+        color: #475569;
+        margin: 0;
+        line-height: 1.35;
     }
 </style>
 """, unsafe_allow_html=True)
 
+# Encabezado Principal (Hero Banner)
 st.markdown("""
 <div class="iht-header-container">
-    <div class="iht-tagline">SISTEMA INTEGRAL DE AUDITORÍA OCUPACIONAL</div>
+    <div class="iht-tagline">🛡️ SISTEMA INTEGRAL DE AUDITORÍA OCUPACIONAL</div>
     <div class="iht-title">IH&T Services — Ergonomía & Biomecánica 4.0</div>
     <div class="iht-subtitle">Plataforma Unificada bajo D.E. 255, Anexo 3 MDT y Acuerdo MSP 00004-2026 (SISAT).</div>
 </div>
 """, unsafe_allow_html=True)
 
+# Sección de Carga
 st.markdown("#### **1. Carga de Registro Fílmico para Auditoría**")
+
+# Guía técnica de captura para optimizar el análisis pericial (Empty State Guidance)
+with st.expander("ℹ️ Criterios técnicos de captura recomendados para el análisis cinemático", expanded=False):
+    g1, g2, g3 = st.columns(3)
+    with g1:
+        st.markdown("""
+        <div class="capture-tip-card">
+            <div class="capture-tip-title">📐 Ángulo y Perspectiva</div>
+            <p class="capture-tip-desc">Posicionar la cámara a 90° respecto al plano principal de movimiento (plano sagital o frontal) para minimizar distorsión de perspectiva.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with g2:
+        st.markdown("""
+        <div class="capture-tip-card">
+            <div class="capture-tip-title">🎯 Encuadre y Visibilidad</div>
+            <p class="capture-tip-desc">Asegurar visualización completa de los segmentos corporales evaluados (cabeza-cuello, tronco, miembros superiores e inferiores) sin oclusiones.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with g3:
+        st.markdown("""
+        <div class="capture-tip-card">
+            <div class="capture-tip-title">⏱️ Tasa de Cuadros y Luz</div>
+            <p class="capture-tip-desc">Grabar a un mínimo de 30 FPS con iluminación homogénea y sin desenfoque de movimiento durante la ejecución de las tareas críticas.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
 uploaded_file = st.file_uploader(
-    "Selecciona el archivo de video (.mp4, .mov, .avi) de la estación evaluada:",
-    type=["mp4", "mov", "avi"]
+    "Selecciona o arrastra el archivo de video (.mp4, .mov, .avi) de la estación evaluada:",
+    type=["mp4", "mov", "avi"],
+    help="Formatos admitidos: MP4, MOV, AVI. Tamaño máximo permitido por archivo: 200 MB."
 )
 
 default_worker_id = "OPERARIO_01"
@@ -109,19 +251,34 @@ if uploaded_file is not None:
         st.session_state["auditoria_completada"] = False
         st.session_state["last_uploaded_name"] = uploaded_file.name
 
+# Barra Lateral (Configuración y Marco Legal)
 with st.sidebar:
     st.markdown("### **IH&T Services**")
     st.caption("Industrial Hygiene & Occupational Health Consulting")
     st.markdown("---")
     
     st.markdown("#### **Parámetros del Dictamen**")
-    worker_id = st.text_input("Identificador del Sujeto / Puesto", value=default_worker_id)
-    session_id = st.text_input("N° Expediente de Auditoría", value=f"PER-ERG-{default_worker_id}")
+    worker_id = st.text_input(
+        "Identificador del Sujeto / Puesto",
+        value=default_worker_id,
+        help="Identificador alfanumérico único para indexar el puesto evaluado."
+    )
+    session_id = st.text_input(
+        "N° Expediente de Auditoría",
+        value=f"PER-ERG-{default_worker_id}",
+        help="Código único de expediente para trazabilidad legal y forense."
+    )
     
     metodo_opcion = st.selectbox(
         "Protocolo Metodológico",
-        options=["AUTO (Triage con IA)", "ROSA (PVD / Sedestación)", "REBA (Cuerpo Entero / Dinámico)", "RULA (Carga Postural Superior)"],
-        index=0
+        options=[
+            "AUTO (Triage con IA)",
+            "ROSA (PVD / Sedestación)",
+            "REBA (Cuerpo Entero / Dinámico)",
+            "RULA (Carga Postural Superior)"
+        ],
+        index=0,
+        help="Seleccione el protocolo ergonómico específico o permita el triage automático basado en visión computacional."
     )
     st.markdown("---")
     st.markdown("#### **Marco Normativo Ecuatoriano**")
@@ -136,98 +293,127 @@ with st.sidebar:
     st.markdown("---")
     st.caption("🌐 [www.ih-t.net](https://www.ih-t.net)")
 
+# Ejecución del Pipeline Biomecánico
 if uploaded_file is not None:
-    col_btn, _ = st.columns([1.5, 3])
+    col_btn, col_info = st.columns([1.5, 3])
     with col_btn:
         ejecutar_btn = st.button("🔬 Iniciar Auditoría Biomecánica", type="primary", use_container_width=True)
+    with col_info:
+        st.caption(f"📁 **Archivo:** `{uploaded_file.name}` ({uploaded_file.size / (1024*1024):.1f} MB) | Listo para análisis.")
 
     if ejecutar_btn:
-        with st.spinner("⏳ Ejecutando tracking cráneo-cervical, validación de coherencia y renderizado determinista..."):
+        # Importación diferida de módulos del pipeline
+        from src.extractor import procesar_video
+        from src.classifier import clasificar_puesto_automaticamente
+        from src.reporter import planificar_evidencias, generar_dictamen_ergonomico
+        from src.visualizer import extraer_candidatos_para_gemini, renderizar_imagenes_segun_instrucciones
+        from src.analytics import inicializar_y_guardar_bd, generar_boxplot_ergonomico
+        from src.science_engine import diagnosticar_intervencion_cientifica
+        from src.pdf_generator import generar_pdf_pericial
+        from src.kinematics import calcular_matriz_rosa_oficial
+        from src.coherence_validator import validar_coherencia_pandas
+
+        with st.status("🔬 Ejecutando pipeline de auditoría biomecánica determinista...", expanded=True) as status:
             tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-            tfile.write(uploaded_file.read())
-            video_path = tfile.name
+            try:
+                tfile.write(uploaded_file.read())
+                tfile.flush()
+                video_path = tfile.name
 
-            if "AUTO" in metodo_opcion:
-                triage = clasificar_puesto_automaticamente(video_path)
-                metodo_seleccionado = triage.get("metodo", "ROSA")
-            elif "ROSA" in metodo_opcion:
-                metodo_seleccionado = "ROSA"
-            elif "REBA" in metodo_opcion:
-                metodo_seleccionado = "REBA"
-            else:
-                metodo_seleccionado = "RULA"
+                st.write("🔹 **Fase 1/6:** Clasificación y triage postural con visión artificial...")
+                if "AUTO" in metodo_opcion:
+                    triage = clasificar_puesto_automaticamente(video_path)
+                    metodo_seleccionado = triage.get("metodo", "ROSA")
+                elif "ROSA" in metodo_opcion:
+                    metodo_seleccionado = "ROSA"
+                elif "REBA" in metodo_opcion:
+                    metodo_seleccionado = "REBA"
+                else:
+                    metodo_seleccionado = "RULA"
 
-            temp_parquet = tempfile.NamedTemporaryFile(delete=False, suffix='.parquet').name
-            procesar_video(video_path, temp_parquet, session_id=session_id, worker_id=worker_id)
+                st.write(f"🔹 **Fase 2/6:** Extrayendo coordenadas articulares (Protocolo: **{metodo_seleccionado}**)...")
+                temp_parquet = tempfile.NamedTemporaryFile(delete=False, suffix='.parquet').name
+                procesar_video(video_path, temp_parquet, session_id=session_id, worker_id=worker_id)
 
-            df_raw = pd.read_parquet(temp_parquet)
-            cap = cv2.VideoCapture(video_path)
-            fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            cap.release()
+                st.write("🔹 **Fase 3/6:** Validación pericial de coherencia y compuerta Spark...")
+                df_raw = pd.read_parquet(temp_parquet)
+                cap = cv2.VideoCapture(video_path)
+                fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                cap.release()
 
-            pdf_continuous, met_calidad = validar_coherencia_pandas(df_raw)
+                pdf_continuous, met_calidad = validar_coherencia_pandas(df_raw)
 
-            t_clean = pdf_continuous["ang_tronco"].values
-            c_clean = pdf_continuous["ang_cuello"].values
-            b_clean = pdf_continuous["ang_brazo_der"].values
-            m_clean = pdf_continuous["ang_muneca_der"].values
+                t_clean = pdf_continuous["ang_tronco"].values
+                c_clean = pdf_continuous["ang_cuello"].values
+                b_clean = pdf_continuous["ang_brazo_der"].values
+                m_clean = pdf_continuous["ang_muneca_der"].values
 
-            t_p50 = float(np.median(t_clean)) if len(t_clean) > 0 else 20.0
-            c_p50 = float(np.median(c_clean)) if len(c_clean) > 0 else 25.0
-            b_p50 = float(np.median(b_clean)) if len(b_clean) > 0 else 20.0
-            m_p50 = float(np.median(m_clean)) if len(m_clean) > 0 else 5.0
+                t_p50 = float(np.median(t_clean)) if len(t_clean) > 0 else 20.0
+                c_p50 = float(np.median(c_clean)) if len(c_clean) > 0 else 25.0
+                b_p50 = float(np.median(b_clean)) if len(b_clean) > 0 else 20.0
+                m_p50 = float(np.median(m_clean)) if len(m_clean) > 0 else 5.0
 
-            if metodo_seleccionado == "ROSA":
-                score_final = calcular_matriz_rosa_oficial(t_p50, c_p50, b_p50, m_p50)
-            else:
-                score_final = 8 if (t_p50 > 30.0 or b_p50 > 45.0) else 6
+                if metodo_seleccionado == "ROSA":
+                    score_final = calcular_matriz_rosa_oficial(t_p50, c_p50, b_p50, m_p50)
+                else:
+                    score_final = 8 if (t_p50 > 30.0 or b_p50 > 45.0) else 6
 
-            pdf_continuous["SCORE_FINAL"] = score_final
+                pdf_continuous["SCORE_FINAL"] = score_final
 
-            resumen_dict = {
-                "session_id": session_id,
-                "worker_id": worker_id,
-                "metodo": metodo_seleccionado,
-                "score_final": score_final,
-                "duracion_total_seg": round(total_frames / fps, 2),
-                "tronco_p10_deg": round(float(np.percentile(t_clean, 10)), 1) if len(t_clean) > 0 else 0.0,
-                "tronco_p50_deg": round(t_p50, 1),
-                "tronco_p95_deg": round(float(np.percentile(t_clean, 95)), 1) if len(t_clean) > 0 else 0.0,
-                "cuello_p10_deg": round(float(np.percentile(c_clean, 10)), 1) if len(c_clean) > 0 else 0.0,
-                "cuello_p50_deg": round(c_p50, 1),
-                "cuello_p95_deg": round(float(np.percentile(c_clean, 95)), 1) if len(c_clean) > 0 else 0.0,
-                "brazo_p10_deg": round(float(np.percentile(b_clean, 10)), 1) if len(b_clean) > 0 else 0.0,
-                "brazo_p50_deg": round(b_p50, 1),
-                "brazo_p95_deg": round(float(np.percentile(b_clean, 95)), 1) if len(b_clean) > 0 else 0.0
-            }
+                resumen_dict = {
+                    "session_id": session_id,
+                    "worker_id": worker_id,
+                    "metodo": metodo_seleccionado,
+                    "score_final": score_final,
+                    "duracion_total_seg": round(total_frames / fps, 2),
+                    "tronco_p10_deg": round(float(np.percentile(t_clean, 10)), 1) if len(t_clean) > 0 else 0.0,
+                    "tronco_p50_deg": round(t_p50, 1),
+                    "tronco_p95_deg": round(float(np.percentile(t_clean, 95)), 1) if len(t_clean) > 0 else 0.0,
+                    "cuello_p10_deg": round(float(np.percentile(c_clean, 10)), 1) if len(c_clean) > 0 else 0.0,
+                    "cuello_p50_deg": round(c_p50, 1),
+                    "cuello_p95_deg": round(float(np.percentile(c_clean, 95)), 1) if len(c_clean) > 0 else 0.0,
+                    "brazo_p10_deg": round(float(np.percentile(b_clean, 10)), 1) if len(b_clean) > 0 else 0.0,
+                    "brazo_p50_deg": round(b_p50, 1),
+                    "brazo_p95_deg": round(float(np.percentile(b_clean, 95)), 1) if len(b_clean) > 0 else 0.0
+                }
 
-            out_img_dir = f"reportes/img/{worker_id}"
-            os.makedirs(out_img_dir, exist_ok=True)
-            candidatos = extraer_candidatos_para_gemini(video_path)
-            plan = planificar_evidencias(candidatos, metodo_seleccionado, score_final)
-            renderizar_imagenes_segun_instrucciones(video_path, plan, pdf_continuous, out_img_dir, worker_id)
+                st.write("🔹 **Fase 4/6:** Reconstrucción de evidencias cinemáticas y renderizado...")
+                out_img_dir = f"reportes/img/{worker_id}"
+                os.makedirs(out_img_dir, exist_ok=True)
+                candidatos = extraer_candidatos_para_gemini(video_path)
+                plan = planificar_evidencias(candidatos, metodo_seleccionado, score_final)
+                renderizar_imagenes_segun_instrucciones(video_path, plan, pdf_continuous, out_img_dir, worker_id)
 
-            boxplot_path = f"{out_img_dir}/boxplot_distribucion_postural.png"
-            generar_boxplot_ergonomico(pdf_continuous, boxplot_path, worker_id, metodo_seleccionado)
+                st.write("🔹 **Fase 5/6:** Generando análisis de distribución postural y persistencia SQLite...")
+                boxplot_path = f"{out_img_dir}/boxplot_distribucion_postural.png"
+                generar_boxplot_ergonomico(pdf_continuous, boxplot_path, worker_id, metodo_seleccionado)
+                inicializar_y_guardar_bd(pdf_continuous, resumen_dict, "data/ergo_database.db")
 
-            inicializar_y_guardar_bd(pdf_continuous, resumen_dict, "data/ergo_database.db")
+                st.write("🔹 **Fase 6/6:** Redactando dictamen técnico estructurado e intervenciones...")
+                informe_md = generar_dictamen_ergonomico(resumen_dict, plan, metodo_seleccionado, f"img/{worker_id}")
+                archivo_reporte = f"reportes/Informe_{session_id}_{worker_id}.md"
+                with open(archivo_reporte, "w", encoding="utf-8") as f:
+                    f.write(informe_md)
 
-            informe_md = generar_dictamen_ergonomico(resumen_dict, plan, metodo_seleccionado, f"img/{worker_id}")
-            archivo_reporte = f"reportes/Informe_{session_id}_{worker_id}.md"
-            with open(archivo_reporte, "w", encoding="utf-8") as f:
-                f.write(informe_md)
+                st.session_state["auditoria_completada"] = True
+                st.session_state["resumen_dict"] = resumen_dict
+                st.session_state["plan"] = plan
+                st.session_state["informe_md"] = informe_md
+                st.session_state["out_img_dir"] = out_img_dir
+                st.session_state["boxplot_path"] = boxplot_path
+                st.session_state["met_calidad"] = met_calidad
+                st.session_state["diag_ciencia"] = diagnosticar_intervencion_cientifica(resumen_dict, metodo_seleccionado)
 
-            st.session_state["auditoria_completada"] = True
-            st.session_state["resumen_dict"] = resumen_dict
-            st.session_state["plan"] = plan
-            st.session_state["informe_md"] = informe_md
-            st.session_state["out_img_dir"] = out_img_dir
-            st.session_state["boxplot_path"] = boxplot_path
-            st.session_state["met_calidad"] = met_calidad
-            st.session_state["diag_ciencia"] = diagnosticar_intervencion_cientifica(resumen_dict, metodo_seleccionado)
-            st.success("✅ ¡Auditoría Biomecánica Unificada Finalizada con Éxito!")
+                status.update(label="✅ ¡Auditoría Biomecánica Unificada Finalizada con Éxito!", state="complete", expanded=False)
+            finally:
+                if os.path.exists(tfile.name):
+                    try:
+                        os.remove(tfile.name)
+                    except Exception:
+                        pass
 
+# Panel de Resultados y Visualización Forense
 if st.session_state.get("auditoria_completada", False):
     res = st.session_state["resumen_dict"]
     plan = st.session_state["plan"]
@@ -239,6 +425,7 @@ if st.session_state.get("auditoria_completada", False):
 
     st.markdown("---")
     
+    # Sello de Calidad y Confiabilidad
     q_class = f"quality-{calidad['color_badge']}"
     st.markdown(f"""
     <div class="quality-banner {q_class}">
@@ -246,7 +433,7 @@ if st.session_state.get("auditoria_completada", False):
             <b>🛡️ SELLO DE AUDITORÍA Y CONTROL DE CALIDAD BIOMECÁNICA (SPARK GATEKEEPER)</b><br>
             <span style="font-size:0.85rem;">Confiabilidad de Señal: <b>{calidad['score_confiabilidad_pct']}%</b> | Dictamen: <b>{calidad['dictamen_integridad']}</b></span>
         </div>
-        <div style="font-size:1.1rem; font-weight:700;">
+        <div style="font-size:1.15rem; font-weight:800;">
             {calidad['frames_validos_limpios']} / {calidad['total_frames_analizados']} Frames Íntegros
         </div>
     </div>
@@ -254,7 +441,9 @@ if st.session_state.get("auditoria_completada", False):
 
     st.markdown(f"### **2. Tablero de Control: `{res['worker_id']}` ({res['session_id']})**")
 
+    # Grid de KPIs Ergonómicos Principales
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    
     with kpi1:
         score_val = res['score_final']
         b_color = "border-danger" if score_val >= 7 else ("border-warning" if score_val >= 5 else "border-success")
@@ -263,7 +452,7 @@ if st.session_state.get("auditoria_completada", False):
         <div class="kpi-box {b_color}">
             <div class="kpi-title">Puntuación Global ({res['metodo']})</div>
             <div class="kpi-value {t_color}">{score_val} / 10</div>
-            <div class="kpi-sub {t_color}">{'Nivel de Acción 3 (Muy Alto)' if score_val>=7 else 'Nivel de Acción 2 (Medio)'}</div>
+            <div class="kpi-sub {t_color}">{'⚠️ Nivel de Acción 3 (Muy Alto)' if score_val>=7 else ('⚡ Nivel de Acción 2 (Medio)' if score_val>=5 else '✅ Nivel 1 (Aceptable)')}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -275,7 +464,7 @@ if st.session_state.get("auditoria_completada", False):
         <div class="kpi-box {b_color}">
             <div class="kpi-title">Tronco — Mediana P50</div>
             <div class="kpi-value {t_color}">{t_val}°</div>
-            <div class="kpi-sub">ISO 11226: {'No Conforme (>20°)' if t_val>20 else 'Conforme (<20°)'}</div>
+            <div class="kpi-sub">ISO 11226: <span class="{t_color}">{'No Conforme (>20°)' if t_val>20 else 'Conforme (≤20°)'}</span></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -285,9 +474,9 @@ if st.session_state.get("auditoria_completada", False):
         t_color = "text-danger" if c_val > 25 else "text-success"
         st.markdown(f"""
         <div class="kpi-box {b_color}">
-            <div class="kpi-title">Cuello (C7-Cara) — Mediana P50</div>
+            <div class="kpi-title">Cuello (C7-Cara) — P50</div>
             <div class="kpi-value {t_color}">{c_val}°</div>
-            <div class="kpi-sub">ISO 11226: {'No Conforme (>25°)' if c_val>25 else 'Conforme (<25°)'}</div>
+            <div class="kpi-sub">ISO 11226: <span class="{t_color}">{'No Conforme (>25°)' if c_val>25 else 'Conforme (≤25°)'}</span></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -297,14 +486,15 @@ if st.session_state.get("auditoria_completada", False):
         t_color = "text-warning" if b_val > 20 else "text-success"
         st.markdown(f"""
         <div class="kpi-box {b_color}">
-            <div class="kpi-title">Brazo / Hombro — Mediana P50</div>
+            <div class="kpi-title">Brazo / Hombro — P50</div>
             <div class="kpi-value {t_color}">{b_val}°</div>
-            <div class="kpi-sub">ISO 11226: {'Alerta (>20°)' if b_val>20 else 'Conforme (<20°)'}</div>
+            <div class="kpi-sub">ISO 11226: <span class="{t_color}">{'Alerta (>20°)' if b_val>20 else 'Conforme (≤20°)'}</span></div>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # Pestañas de Análisis Detallado
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📸 Evidencias Cinemáticas 3D", 
         "📊 Distribución Postural (ISO 11226)", 
@@ -333,13 +523,19 @@ if st.session_state.get("auditoria_completada", False):
 
     with tab3:
         st.markdown("#### **Reporte de Auditoría de Datos y Compuerta de Coherencia**")
-        st.markdown(f"""
-        * **Total de Muestras Cinemáticas:** `{calidad['total_frames_analizados']} fotogramas`
-        * **Muestras Válidas Filtradas:** `{calidad['frames_validos_limpios']} fotogramas`
-        * **Artefactos / Saltos de Tracking Descartados:** `{calidad['frames_anomalos_filtrados']} fotogramas`
-        * **Índice de Confiabilidad Pericial:** **`{calidad['score_confiabilidad_pct']}%`**
-        * **Veredicto:** `{calidad['dictamen_integridad']}`
-        """)
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            st.markdown(f"""
+            * **Total de Muestras Cinemáticas:** `{calidad['total_frames_analizados']} fotogramas`
+            * **Muestras Válidas Filtradas:** `{calidad['frames_validos_limpios']} fotogramas`
+            * **Artefactos / Saltos Descartados:** `{calidad['frames_anomalos_filtrados']} fotogramas`
+            """)
+        with col_m2:
+            st.markdown(f"""
+            * **Índice de Confiabilidad Pericial:** **`{calidad['score_confiabilidad_pct']}%`**
+            * **Veredicto de Integridad:** `{calidad['dictamen_integridad']}`
+            * **Tasa de Pérdida de Señal:** `{(calidad['frames_anomalos_filtrados']/max(1, calidad['total_frames_analizados'])*100):.2f}%`
+            """)
 
     with tab4:
         st.markdown("#### **Prescripción Técnica de Exoesqueletos Ocupacionales**")
@@ -347,7 +543,7 @@ if st.session_state.get("auditoria_completada", False):
             for exo in diag_cie["prescripcion_exoesqueletos"]:
                 st.markdown(f"""
                 <div class="exo-card">
-                    <h4 style="color:#15803D; margin-bottom:5px;">🦾 {exo['tecnologia']}</h4>
+                    <h4>🦾 {exo['tecnologia']}</h4>
                     <p><b>Modelo de Referencia / Estándar:</b> {exo['modelo_ref']}</p>
                     <p><b>Criterio Biomecánico:</b> {exo['indicacion_biomecanica']}</p>
                     <p><b>Beneficio Fisiológico Demostrado:</b> {exo['beneficio_esperado']}</p>
@@ -357,13 +553,13 @@ if st.session_state.get("auditoria_completada", False):
             st.info("ℹ️ **Criterio Pericial:** El puesto evaluado (PVD/Oficina) se resuelve prioritariamente mediante adecuaciones antropométricas de ingeniería física convencional (ISO 9241-5). No se requiere equipamiento vestible.")
 
     with tab5:
+        from src.pdf_generator import generar_pdf_pericial
         st.markdown("#### **Dictamen Técnico Pericial de Ergonomía Ocupacional**")
-        
         st.markdown("---")
         st.markdown("##### **✍️ Campo de Observaciones y Recomendaciones del Perito**")
         comentarios_perito = st.text_area(
-            "Ingrese notas de campo, detalles del trabajador o recomendaciones específicas que desea integrar directamente en la Sección 6 del PDF:",
-            value=f"Evaluación realizada para el puesto de trabajo de {res['worker_id']}. Se recomienda realizar un reajuste ergonómico del atril de pantalla y seguimiento médico ocupacional en el SISAT en un plazo no mayor a 30 días.",
+            "Ingrese notas de campo, detalles del trabajador o recomendaciones específicas para la Sección 6 del PDF oficial:",
+            value=f"Evaluación realizada para el puesto de trabajo de {res['worker_id']}. Se recomienda realizar un reajuste ergonómico del plano de trabajo/pantalla y seguimiento médico ocupacional en el SISAT en un plazo no mayor a 30 días.",
             height=110
         )
         

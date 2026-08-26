@@ -33,10 +33,6 @@ for p in ["logo.png", "assets/logo.png", "img/logo.png", "assets/logo.svg", "log
 # --- Módulos de Cálculo, Telemetría, Ciclos y Ecuación NIOSH (ISO 11228-1/3) ---
 
 def segmentar_ciclos_cinematicos(pdf_continuous, fps=30.0):
-    """
-    Segmenta automáticamente los ciclos de trabajo a partir de la serie temporal cinemática
-    utilizando análisis de picos y derivadas angulares (SSO 4.0).
-    """
     col = 'ang_tronco' if 'ang_tronco' in pdf_continuous.columns else pdf_continuous.columns[0]
     signal = pdf_continuous[col].dropna().values
     
@@ -785,16 +781,21 @@ if uploaded_file is not None:
 
                 pdf_continuous, met_calidad = validar_coherencia_pandas(df_raw)
 
-                # Corrección defensiva estricta para garantizar compatibilidad con visualizer.py
+                # Sincronización defensiva total de coordenadas para visualizer.py
+                coord_cols = [
+                    'frame_index', 'frame', 'ear_x', 'ear_y', 'target_face_x', 'target_face_y',
+                    'c7_x', 'c7_y', 'sh_x', 'sh_y', 'elb_x', 'elb_y', 'wri_x', 'wri_y',
+                    'ind_x', 'ind_y', 'hip_x', 'hip_y', 'knee_x', 'knee_y', 'ank_x', 'ank_y',
+                    'toe_x', 'toe_y', 'ocluido', 'estado_piernas'
+                ]
+                for col in coord_cols:
+                    if col not in pdf_continuous.columns and col in df_raw.columns:
+                        pdf_continuous[col] = df_raw[col].values
+                    elif col not in pdf_continuous.columns:
+                        pdf_continuous[col] = 100.0 if ('_x' in col or '_y' in col) else 0
+
                 if "frame_index" not in pdf_continuous.columns:
-                    if "frame" in pdf_continuous.columns:
-                        pdf_continuous["frame_index"] = pdf_continuous["frame"]
-                    elif "frame_idx" in pdf_continuous.columns:
-                        pdf_continuous["frame_index"] = pdf_continuous["frame_idx"]
-                    elif "frame_id" in pdf_continuous.columns:
-                        pdf_continuous["frame_index"] = pdf_continuous["frame_id"]
-                    else:
-                        pdf_continuous["frame_index"] = np.arange(len(pdf_continuous))
+                    pdf_continuous["frame_index"] = np.arange(len(pdf_continuous))
                 if "frame" not in pdf_continuous.columns:
                     pdf_continuous["frame"] = pdf_continuous["frame_index"]
 

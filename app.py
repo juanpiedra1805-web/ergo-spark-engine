@@ -30,16 +30,58 @@ for p in ["logo.png", "assets/logo.png", "img/logo.png", "assets/logo.svg", "log
         LOGO_PATH = p
         break
 
-# --- Módulos de Cálculo, Telemetría y Ecuación NIOSH (ISO 11228-1) ---
+# --- Módulos de Cálculo, Telemetría, Ciclos y Ecuación NIOSH (ISO 11228-1/3) ---
+
+def segmentar_ciclos_cinematicos(pdf_continuous, fps=30.0):
+    """
+    Segmenta automáticamente los ciclos de trabajo a partir de la serie temporal cinemática
+    utilizando análisis de picos y derivadas angulares (SSO 4.0).
+    """
+    col = 'ang_tronco' if 'ang_tronco' in pdf_continuous.columns else pdf_continuous.columns[0]
+    signal = pdf_continuous[col].dropna().values
+    
+    if len(signal) < int(fps * 2):
+        return {
+            "num_ciclos": 1,
+            "tiempo_ciclo_promedio_seg": round(len(signal) / max(1.0, fps), 2),
+            "frecuencia_ciclos_min": round((60.0 * max(1.0, fps)) / max(1, len(signal)), 1),
+            "es_repetitivo_iso_11228_3": False
+        }
+        
+    window = max(3, int(fps * 0.5))
+    smoothed = pd.Series(signal).rolling(window=window, min_periods=1, center=True).mean().values
+    
+    diffs = np.diff(smoothed)
+    zero_crossings = np.where((diffs[:-1] > 0) & (diffs[1:] <= 0))[0]
+    
+    min_dist_frames = int(fps * 1.5)
+    valid_peaks = []
+    for p in zero_crossings:
+        if not valid_peaks or (p - valid_peaks[-1]) >= min_dist_frames:
+            valid_peaks.append(p)
+            
+    num_ciclos = max(1, len(valid_peaks))
+    duracion_total_seg = len(signal) / max(1.0, fps)
+    
+    if num_ciclos > 1:
+        tiempos_entre_picos = np.diff(valid_peaks) / fps
+        tiempo_ciclo_promedio = round(float(np.mean(tiempos_entre_picos)), 2)
+    else:
+        tiempo_ciclo_promedio = round(duracion_total_seg, 2)
+        
+    frecuencia_min = round(60.0 / max(0.5, tiempo_ciclo_promedio), 1)
+    es_repetitivo = (tiempo_ciclo_promedio < 30.0)
+    
+    return {
+        "num_ciclos": num_ciclos,
+        "tiempo_ciclo_promedio_seg": tiempo_ciclo_promedio,
+        "frecuencia_ciclos_min": frecuencia_min,
+        "es_repetitivo_iso_11228_3": es_repetitivo
+    }
 
 def calcular_niosh_completo(peso_real=15.0, H=35.0, V=75.0, D=50.0, A=0.0, F=2.0, duracion_horas="< 1 h", agarre="Bueno"):
-    """
-    Calcula la Ecuación de Levantamiento de NIOSH Revisada (RNLE / ISO 11228-1).
-    Retorna los multiplicadores, el RWL (Límite de Peso Recomendado) y el LI (Índice de Levantamiento).
-    """
-    LC = 23.0  # Constante de Carga en kg
+    LC = 23.0
     
-    # 1. Factor Horizontal (HM)
     if H <= 25.0:
         HM = 1.0
     elif H >= 63.0:
@@ -47,13 +89,11 @@ def calcular_niosh_completo(peso_real=15.0, H=35.0, V=75.0, D=50.0, A=0.0, F=2.0
     else:
         HM = round(25.0 / H, 3)
         
-    # 2. Factor Vertical (VM)
     if V > 175.0:
         VM = 0.0
     else:
         VM = round(max(0.0, 1.0 - 0.003 * abs(V - 75.0)), 3)
         
-    # 3. Factor Distancia (DM)
     if D <= 25.0:
         DM = 1.0
     elif D >= 175.0:
@@ -61,7 +101,6 @@ def calcular_niosh_completo(peso_real=15.0, H=35.0, V=75.0, D=50.0, A=0.0, F=2.0
     else:
         DM = round(0.82 + (4.5 / D), 3)
         
-    # 4. Factor Asimetría / Torsión (AM)
     if A <= 0.0:
         AM = 1.0
     elif A >= 135.0:
@@ -69,7 +108,6 @@ def calcular_niosh_completo(peso_real=15.0, H=35.0, V=75.0, D=50.0, A=0.0, F=2.0
     else:
         AM = round(1.0 - 0.0032 * A, 3)
         
-    # 5. Factor Frecuencia (FM) aproximado según tabla estándar NIOSH
     if F <= 0.2:
         FM = 1.0
     elif F <= 1.0:
@@ -85,7 +123,6 @@ def calcular_niosh_completo(peso_real=15.0, H=35.0, V=75.0, D=50.0, A=0.0, F=2.0
     else:
         FM = 0.35 if "< 1" in duracion_horas else (0.15 if "1-2" in duracion_horas else 0.0)
         
-    # 6. Factor Agarre (CM)
     if "Bueno" in agarre:
         CM = 1.0
     elif "Regular" in agarre or "Aceptable" in agarre:
@@ -314,9 +351,12 @@ def generar_analisis_cientifico_graficos(res):
     sintomas = res.get('sintomas_nordicos', 'Ninguno reportado')
     duracion = res.get('duracion_total_seg', 50.0)
     oclusion_leg = res.get('miembros_inf_ocluido', False)
+    ciclos = res.get('ciclos_telemetria', {})
     
     t_estado = "No Conforme (> 20 grados)" if t_p50 > 20 else "Conforme (<= 20 grados)"
     c_estado = "No Conforme (> 25 grados)" if c_p50 > 25 else "Conforme (<= 25 grados)"
+    
+    rep_txt = f"Se identificaron {ciclos.get('num_ciclos', 1)} ciclos con un tiempo promedio por ciclo de Tc = {ciclos.get('tiempo_ciclo_promedio_seg', duracion)} s ({'Cumple criterio de repetitividad ISO 11228-3: Tc < 30 s' if ciclos.get('es_repetitivo_iso_11228_3') else 'Ciclo largo no repetitivo'})."
     
     if "NIOSH" in metodo:
         niosh_data = res.get("niosh_res", {})
@@ -326,18 +366,19 @@ def generar_analisis_cientifico_graficos(res):
         p1 = (
             f"1. Evaluación del Manejo Manual de Cargas (Ecuación NIOSH / ISO 11228-1): "
             f"El puesto {worker_id} registra una masa real levantada de L = {peso} kg frente a un Límite de Peso Recomendado de RWL = {rwl} kg, "
-            f"resultando en un Índice de Levantamiento de LI = {li} ({niosh_data.get('nivel_riesgo', 'N/A')}). "
+            f"resultando en un Índice de Levantamiento de LI = {li} ({niosh_data.get('nivel_riesgo', 'N/A')}). {rep_txt} "
             f"Conforme a los estándares biomecánicos de la Ecuación Revisada de NIOSH (Waters et al., 1993; ISO 11228-1), "
             f"valores de LI superiores a 1.0 imponen fuerzas de compresión sobre el disco intervertebral L5-S1 que superan el límite de tolerancia fisiológica de 3.4 kN, "
             f"incrementando significativamente el riesgo de patología discal y lumbalgia mecánica ocupacional."
         )
         p2 = (
-            f"2. Cinemática Postural y Delimitación Pericial (SSO 4.0 / Res. C.D. 513 IESS): "
-            f"Durante las fases de agarre y transferencia de carga (registro de {duracion} segundos), la flexión de tronco alcanza una mediana de P50 = {t_p50}° "
+            f"2. Cinemática Postural, Cronometría y Delimitación Pericial (SSO 4.0 / Res. C.D. 513 IESS): "
+            f"Durante las fases de agarre y transferencia de carga (registro continuo de {duracion} segundos), la flexión de tronco alcanza una mediana de P50 = {t_p50}° "
             f"con momentos de asimetría que penalizan el factor de torsión angular (AM = {niosh_data.get('AM', 1.0)}). "
             f"Esta telemetría objetiva demuestra una relación dosis-respuesta directa para la tarea evaluada y concordancia con los síntomas osteomusculares reportados ({sintomas}), "
             f"cumpliendo los criterios de plausibilidad biológica del Cuestionario Nórdico (Kuorinka et al., 1987), el Anexo 3 del MDT y la Resolución C.D. 513 del IESS. "
-            f"Para la calificación definitiva de enfermedad profesional, se debe contrastar este ciclo con la frecuencia total acumulada en la jornada de 8 horas."
+            f"Para la calificación definitiva de enfermedad profesional, la tasa estimada por jornada ({res.get('ciclos_jornada_estimados', 0)} ciclos/día en {res.get('horas_tarea_diaria', 6)} h) "
+            f"confirma una exposición sostenida sujeta a control ergonómico."
         )
         return f"{p1}\n\n{p2}"
 
@@ -362,15 +403,14 @@ def generar_analisis_cientifico_graficos(res):
     )
 
     p2 = (
-        f"2. Cinemática Continua, Dosis Temporal y Alcance Pericial (SSO 4.0 / Res. C.D. 513 IESS): "
-        f"La curva de exposición temporal continua (registro de {duracion} segundos) demuestra que el trabajador mantiene posturas fuera de los límites de confort durante el {pct_est}% del tiempo filmado, "
-        f"acumulando una dosis de fatiga postural progresiva que valida el Score Continuo Fuzzy de {score_cont} / 10 (Puntuación Oficial del Método: {score_final} puntos). "
-        f"Bajo los modelos de Ergonomía 4.0 e inferencia cinemática markerless (Huang, Jia & Wang, 2024; Bortolini et al., 2021), "
-        f"el mantenimiento ininterrumpido de flexiones axiales por períodos superiores a 4 segundos induce fatiga muscular estática sostenida e isquemia local transitoria "
-        f"(Rohmert, 1973; Sjøgaard & Søgaard, 1998). "
-        f"Esta telemetría objetiva demuestra una relación dosis-respuesta directa para el ciclo analizado y concordancia topográfica con la sintomatología osteomuscular reportada ({sintomas}), "
-        f"cumpliendo los criterios de plausibilidad biológica del Cuestionario Nórdico (Kuorinka et al., 1987), el Anexo 3 del MDT y la Resolución C.D. 513 del IESS. "
-        f"Para la calificación definitiva de enfermedad profesional ante el Seguro General de Riesgos del Trabajo, se recomienda correlacionar esta tasa de exposición con la jornada laboral diaria completa de 8 horas y los ciclos de rotación."
+        f"2. Cinemática Continua, Cronometría de Ciclos y Alcance Pericial (SSO 4.0 / Res. C.D. 513 IESS): "
+        f"La telemetría continua (registro de {duracion} s) corrobora {rep_txt} "
+        f"El trabajador mantiene posturas forzadas durante el {pct_est}% del tiempo filmado, "
+        f"lo que equivale a una exposición diaria proyectada de {res.get('horas_riesgo_diario', 0)} horas en postura forzada (jornada de {res.get('horas_tarea_diaria', 6)} h de tarea). "
+        f"Bajo los modelos de Ergonomía 4.0 e inferencia markerless (Huang, Jia & Wang, 2024; Bortolini et al., 2021), "
+        f"la mantención de flexiones axiales por períodos >4 s induce fatiga muscular estática e isquemia local transitoria (Rohmert, 1973; Sjøgaard & Søgaard, 1998). "
+        f"Esta telemetría objetiva demuestra una relación dosis-respuesta directa y concordancia topográfica con la sintomatología osteomuscular ({sintomas}), "
+        f"satisfaciendo el nexo de causalidad bajo la Resolución C.D. 513 del IESS y el Anexo 3 del MDT."
     )
 
     return f"{p1}\n\n{p2}"
@@ -560,7 +600,7 @@ st.markdown(f"""
     <div class="iht-header-content">
         <div class="iht-tagline">🛡️ SISTEMA INTEGRAL DE AUDITORÍA OCUPACIONAL</div>
         <div class="iht-title">IH&T Services — Ergonomía & Biomecánica 4.0</div>
-        <div class="iht-subtitle">Plataforma Unificada bajo D.E. 255, Anexo 3 MDT, ISO 11228-1 y Acuerdo MSP 00004-2026 (SISAT).</div>
+        <div class="iht-subtitle">Plataforma Unificada bajo D.E. 255, Anexo 3 MDT, ISO 11228-1/3 y Acuerdo MSP 00004-2026 (SISAT).</div>
     </div>
     {logo_html}
 </div>
@@ -607,7 +647,7 @@ if uploaded_file is not None:
         st.session_state["auditoria_completada"] = False
         st.session_state["last_uploaded_name"] = uploaded_file.name
 
-# 4. Barra Lateral con Parámetros Avanzados, NIOSH, Variables de Carga y Síntomas
+# 4. Barra Lateral con Parámetros Avanzados, Cronometría, NIOSH y Síntomas
 with st.sidebar:
     if LOGO_PATH:
         st.image(LOGO_PATH, use_container_width=True)
@@ -642,13 +682,23 @@ with st.sidebar:
         help="Seleccione el protocolo ergonómico específico o permita el triage automático basado en visión computacional."
     )
 
+    with st.expander("⏱️ Cronometría & Organización de la Jornada", expanded=False):
+        horas_tarea_dia = st.number_input(
+            "Horas dedicadas a esta tarea en la jornada diaria (h/día)",
+            value=6.0,
+            min_value=0.5,
+            max_value=12.0,
+            step=0.5,
+            help="Tiempo diario efectivo de exposición a la tarea evaluada para extrapolación IESS."
+        )
+
     es_metodo_niosh = "NIOSH" in metodo_opcion
     with st.expander("📦 Parámetros de Levantamiento de Cargas (NIOSH / ISO 11228-1)", expanded=es_metodo_niosh):
         peso_carga_num = st.number_input("Masa Real Levantada L (kg)", value=15.0, min_value=0.5, max_value=60.0, step=0.5)
-        h_dist = st.slider("Distancia Horizontal H (cm)", min_value=25, max_value=65, value=35, help="Distancia horizontal desde el punto medio de los tobillos al punto de agarre.")
-        v_alt = st.slider("Altura Vertical de Origen V (cm)", min_value=0, max_value=175, value=75, help="Altura vertical de las manos desde el suelo al iniciar el levantamiento.")
-        d_desp = st.slider("Desplazamiento Vertical D (cm)", min_value=25, max_value=175, value=50, help="Distancia vertical recorrida por la carga.")
-        a_asim = st.slider("Ángulo de Asimetría / Torsión A (°)", min_value=0, max_value=135, value=0, help="Ángulo de torsión del tronco respecto al plano sagital.")
+        h_dist = st.slider("Distancia Horizontal H (cm)", min_value=25, max_value=65, value=35)
+        v_alt = st.slider("Altura Vertical de Origen V (cm)", min_value=0, max_value=175, value=75)
+        d_desp = st.slider("Desplazamiento Vertical D (cm)", min_value=25, max_value=175, value=50)
+        a_asim = st.slider("Ángulo de Asimetría / Torsión A (°)", min_value=0, max_value=135, value=0)
         f_freq = st.number_input("Frecuencia F (levantamientos/min)", value=2.0, min_value=0.2, max_value=15.0, step=0.5)
         duracion_tarea = st.selectbox("Duración de la Tarea", options=["< 1 h (Corta)", "1-2 h (Moderada)", "2-8 h (Larga)"])
         tipo_agarre = st.selectbox(
@@ -676,7 +726,7 @@ with st.sidebar:
     st.markdown("""
 - **D.E. 255:** Reglamento Seguridad y Salud.
 - **Anexo 3 MDT:** Norma Técnica Posturas Forzadas.
-- **ISO 11228-1:** Manejo Manual de Cargas.
+- **ISO 11228-1/3:** Cargas y Repetitividad.
 - **Acuerdo MSP 00004-2026:** Reglamento SISAT.
 - **Res. C.D. 513 IESS:** Causalidad de TME.
 - **ISO 11226 / ISO 9241-5:** Biomecánica y PVD.
@@ -726,7 +776,7 @@ if uploaded_file is not None:
                 temp_parquet = tempfile.NamedTemporaryFile(delete=False, suffix='.parquet').name
                 procesar_video(video_path, temp_parquet, session_id=session_id, worker_id=worker_id)
 
-                st.write("🔹 **Fase 3/6:** Validación pericial de coherencia y compuerta Spark...")
+                st.write("🔹 **Fase 3/6:** Validación pericial de coherencia, ciclos y compuerta Spark...")
                 df_raw = pd.read_parquet(temp_parquet)
                 cap = cv2.VideoCapture(video_path)
                 fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
@@ -747,6 +797,11 @@ if uploaded_file is not None:
 
                 pct_tiempo_estatico_riesgo = round((float(np.mean(t_clean > 20.0)) * 100.0), 1) if len(t_clean) > 0 else 0.0
                 leg_eval = evaluar_miembros_inferiores_forense(pdf_continuous)
+                ciclos_info = segmentar_ciclos_cinematicos(pdf_continuous, fps)
+
+                # Proyecciones a Jornada Diaria Completa (IESS Res. 513)
+                ciclos_jornada = int(round(ciclos_info["frecuencia_ciclos_min"] * 60.0 * float(horas_tarea_dia)))
+                horas_riesgo_diario = round((pct_tiempo_estatico_riesgo / 100.0) * float(horas_tarea_dia), 2)
 
                 # Cálculo de Puntuación y Multiplicadores
                 if metodo_seleccionado == "NIOSH":
@@ -788,6 +843,10 @@ if uploaded_file is not None:
                     "duracion_total_seg": round(total_frames / fps, 2),
                     "fps_video": round(fps, 1),
                     "pct_tiempo_estatico_riesgo": pct_tiempo_estatico_riesgo,
+                    "horas_tarea_diaria": float(horas_tarea_dia),
+                    "horas_riesgo_diario": horas_riesgo_diario,
+                    "ciclos_jornada_estimados": ciclos_jornada,
+                    "ciclos_telemetria": ciclos_info,
                     "peso_carga_evaluado": f"{peso_carga_num} kg",
                     "tipo_agarre_evaluado": tipo_agarre,
                     "sintomas_nordicos": sintomas_str,
@@ -830,7 +889,7 @@ if uploaded_file is not None:
                 resumen_dict["analisis_cientifico_txt"] = analisis_cientifico_puros
                 
                 if "5.1. Fundamentación Científica" not in informe_md:
-                    seccion_cientifica_md = f"\n\n### 5.1. Fundamentación Científica y Cinemática Continua (SSO 4.0)\n\n{analisis_cientifico_puros}\n"
+                    seccion_cientifica_md = f"\n\n### 5.1. Fundamentación Científica, Cronometría y Cinemática Continua (SSO 4.0)\n\n{analisis_cientifico_puros}\n"
                     informe_md = informe_md + seccion_cientifica_md
 
                 archivo_reporte = f"reportes/Informe_{session_id}_{worker_id}.md"
@@ -867,6 +926,7 @@ if st.session_state.get("auditoria_completada", False):
     diag_cie = st.session_state["diag_ciencia"]
     calidad = st.session_state["met_calidad"]
     pdf_cont = st.session_state.get("pdf_continuous", pd.DataFrame())
+    ciclos = res.get("ciclos_telemetria", {})
 
     if not os.path.exists(boxplot_file) or os.path.getsize(boxplot_file) == 0:
         generar_boxplot_ergonomico_seguro(pdf_cont, boxplot_file, res["worker_id"], res["metodo"])
@@ -881,7 +941,7 @@ if st.session_state.get("auditoria_completada", False):
     <div class="quality-banner {q_class}">
         <div>
             <b>🛡️ SELLO DE AUDITORÍA Y CONTROL DE CALIDAD BIOMECÁNICA (SPARK GATEKEEPER)</b><br>
-            <span style="font-size:0.85rem;">Confiabilidad de Señal: <b>{calidad['score_confiabilidad_pct']}%</b> | Dictamen: <b>{calidad['dictamen_integridad']}</b> | Muestreo: <b>{res.get('duracion_total_seg', 0)} s</b> | Síntomas: <b>{res.get('sintomas_nordicos', 'N/A')}</b></span>
+            <span style="font-size:0.85rem;">Confiabilidad: <b>{calidad['score_confiabilidad_pct']}%</b> | Duración Filmada: <b>{res.get('duracion_total_seg', 0)} s</b> | Ciclos Detectados: <b>{ciclos.get('num_ciclos', 1)}</b> (Tc = {ciclos.get('tiempo_ciclo_promedio_seg', 0)} s) | Síntomas: <b>{res.get('sintomas_nordicos', 'N/A')}</b></span>
         </div>
         <div style="font-size:1.15rem; font-weight:800;">
             {calidad['frames_validos_limpios']} / {calidad['total_frames_analizados']} Frames Íntegros
@@ -891,7 +951,7 @@ if st.session_state.get("auditoria_completada", False):
 
     st.markdown(f"### **2. Tablero de Control Dinámico SSO 4.0: `{res['worker_id']}` ({res['session_id']})**")
 
-    # Grid de KPIs Ergonómicos Principales (Adaptable a NIOSH / ROSA / REBA)
+    # Grid de KPIs Ergonómicos Principales
     kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
     
     if res["metodo"] == "NIOSH":
@@ -921,9 +981,9 @@ if st.session_state.get("auditoria_completada", False):
         with kpi3:
             st.markdown(f"""
             <div class="kpi-box border-neutral">
-                <div class="kpi-title">Masa Real Levantada</div>
-                <div class="kpi-value">{peso_val} <span style="font-size:1.0rem; color:#64748B;">kg</span></div>
-                <div class="kpi-sub">Carga Física Objeto</div>
+                <div class="kpi-title">Tiempo por Ciclo (Tc)</div>
+                <div class="kpi-value">{ciclos.get('tiempo_ciclo_promedio_seg', 0)} <span style="font-size:1.0rem; color:#64748B;">s</span></div>
+                <div class="kpi-sub">Frecuencia: {ciclos.get('frecuencia_ciclos_min', 0)}/min</div>
             </div>
             """, unsafe_allow_html=True)
         with kpi4:
@@ -995,25 +1055,14 @@ if st.session_state.get("auditoria_completada", False):
             """, unsafe_allow_html=True)
 
         with kpi5:
-            if res.get('miembros_inf_ocluido', False):
-                st.markdown("""
-                <div class="kpi-box border-neutral">
-                    <div class="kpi-title">Miembros Inferiores</div>
-                    <div class="kpi-value text-neutral" style="font-size:1.35rem; margin-top:6px;">N/D (Ocluido)</div>
-                    <div class="kpi-sub text-neutral">Bloqueo por Escritorio</div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                pct_est = res.get('pct_tiempo_estatico_riesgo', 0.0)
-                b_color = "border-danger" if pct_est > 30 else ("border-warning" if pct_est > 10 else "border-success")
-                t_color = "text-danger" if pct_est > 30 else ("text-warning" if pct_est > 10 else "text-success")
-                st.markdown(f"""
-                <div class="kpi-box {b_color}">
-                    <div class="kpi-title">Carga Estática (ISO 11226)</div>
-                    <div class="kpi-value {t_color}">{pct_est}%</div>
-                    <div class="kpi-sub">Tiempo en Flexión >20°</div>
-                </div>
-                """, unsafe_allow_html=True)
+            tc_seg = ciclos.get('tiempo_ciclo_promedio_seg', res.get('duracion_total_seg', 0))
+            st.markdown(f"""
+            <div class="kpi-box border-neutral">
+                <div class="kpi-title">Tiempo Ciclo (Tc)</div>
+                <div class="kpi-value">{tc_seg} <span style="font-size:1.0rem; color:#64748B;">s</span></div>
+                <div class="kpi-sub">{'⚠️ Repetitivo (<30s)' if ciclos.get('es_repetitivo_iso_11228_3') else 'Ciclo Variable'}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1021,7 +1070,7 @@ if st.session_state.get("auditoria_completada", False):
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📸 Evidencias Cinemáticas 3D", 
         "📊 Distribución & Dosis Temporal", 
-        "🛡️ Integridad & Compuerta Spark",
+        "🛡️ Integridad, Ciclos & Coherencia",
         "🦾 Prescripción de Exoesqueletos",
         "📄 Dictamen & Nexo Causal (Res. 513)", 
         "🗄️ Repositorio & Matriz SISAT (MDT)"
@@ -1075,7 +1124,7 @@ if st.session_state.get("auditoria_completada", False):
 
         # Interpretación Científica Dinámica de Dos Párrafos en Texto Limpio
         st.markdown("---")
-        st.markdown("##### **📑 Interpretación Científica y Fundamentación Biomecánica (SSO 4.0)**")
+        st.markdown("##### **📑 Interpretación Científica, Cronometría y Biomecánica (SSO 4.0)**")
         
         p_cientificos = generar_analisis_cientifico_graficos(res).split("\n\n")
         for p_item in p_cientificos:
@@ -1083,23 +1132,25 @@ if st.session_state.get("auditoria_completada", False):
                 st.info(p_item.strip())
 
     with tab3:
-        st.markdown("#### **Reporte de Auditoría de Datos y Compuerta de Coherencia**")
+        st.markdown("#### **Reporte de Cronometría, Repetitividad y Auditoría de Datos**")
         col_m1, col_m2 = st.columns(2)
         with col_m1:
             st.markdown(f"""
-            * **Duración Total Filmada:** `{res.get('duracion_total_seg', 0.0)} segundos ({calidad['total_frames_analizados']} frames)`
-            * **Muestras Válidas Filtradas:** `{calidad['frames_validos_limpios']} fotogramas`
-            * **Artefactos / Saltos Descartados:** `{calidad['frames_anomalos_filtrados']} fotogramas`
-            * **Carga de Trabajo Evaluada:** `{res.get('peso_carga_evaluado', 'N/A')}`
-            * **Tipo de Agarre:** `{res.get('tipo_agarre_evaluado', 'N/A')}`
+            ##### **⏱️ Segmentación Automática de Tiempos y Ciclos:**
+            * **Duración Filmada:** `{res.get('duracion_total_seg', 0.0)} s ({calidad['total_frames_analizados']} frames)`
+            * **Ciclos Cinemáticos Identificados:** `{ciclos.get('num_ciclos', 1)} ciclos`
+            * **Tiempo Promedio de Ciclo (Tc):** `{ciclos.get('tiempo_ciclo_promedio_seg', 0.0)} segundos`
+            * **Frecuencia Observada:** `{ciclos.get('frecuencia_ciclos_min', 0.0)} ciclos / minuto`
+            * **Condición de Repetitividad (ISO 11228-3):** `{'Sí (Tc < 30 s - Tarea Repetitiva)' if ciclos.get('es_repetitivo_iso_11228_3') else 'No (Ciclo Largo / No Repetitivo)'}`
             """)
         with col_m2:
             st.markdown(f"""
-            * **Índice de Confiabilidad Pericial:** **`{calidad['score_confiabilidad_pct']}%`**
-            * **Veredicto de Integridad:** `{calidad['dictamen_integridad']}`
+            ##### **📊 Extrapolación a Jornada Diaria (Res. C.D. 513 IESS):**
+            * **Exposición Diaria a la Tarea:** `{res.get('horas_tarea_diaria', 6.0)} h / día`
+            * **Ciclos Estimados por Turno:** **`{res.get('ciclos_jornada_estimados', 0)} ciclos / jornada`**
+            * **Tiempo Diario en Postura Forzada:** **`{res.get('horas_riesgo_diario', 0.0)} horas / día`**
+            * **Confiabilidad Pericial:** **`{calidad['score_confiabilidad_pct']}%`** ({calidad['dictamen_integridad']})
             * **Estado Miembros Inferiores:** `{'No Evaluable (Oclusión por Escritorio)' if res.get('miembros_inf_ocluido') else res.get('miembros_inf_estado', 'Conforme')}`
-            * **Síntomas Osteomusculares (Kuorinka):** `{res.get('sintomas_nordicos', 'N/A')}`
-            * **Cumplimiento de Privacidad LOPDP:** `{'Activo (Face Blurring)' if res.get('anonimizacion_activa') else 'Registro Directo'}`
             """)
 
     with tab4:
@@ -1169,7 +1220,7 @@ if st.session_state.get("auditoria_completada", False):
         
         comentarios_perito = st.text_area(
             "Ingrese notas de campo, detalles del trabajador o recomendaciones específicas para la Sección 6 del PDF oficial:",
-            value=f"Evaluación pericial del puesto {res['worker_id']} ({res['session_id']}). Protocolo: {score_desc}. Muestreo: {res.get('duracion_total_seg', 0)} s. Síntomas reportados: {res.get('sintomas_nordicos', 'Ninguno')}. {texto_causal_auto}\n\n{analisis_pericial_dinamico}\n\nSe recomienda reajuste ergonómico del puesto de trabajo y seguimiento médico en el SISAT en un plazo no mayor a 30 días.",
+            value=f"Evaluación pericial del puesto {res['worker_id']} ({res['session_id']}). Protocolo: {score_desc}. Muestreo: {res.get('duracion_total_seg', 0)} s (Tc = {ciclos.get('tiempo_ciclo_promedio_seg', 0)} s, Frecuencia: {ciclos.get('frecuencia_ciclos_min', 0)}/min). Síntomas reportados: {res.get('sintomas_nordicos', 'Ninguno')}. {texto_causal_auto}\n\n{analisis_pericial_dinamico}\n\nSe recomienda reajuste ergonómico del puesto de trabajo y seguimiento médico en el SISAT en un plazo no mayor a 30 días.",
             height=180
         )
         

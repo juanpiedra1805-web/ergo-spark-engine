@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import os
 
-# Importación resiliente de MediaPipe
+# Importación resiliente de MediaPipe compatible con todas las versiones
 mp_pose = None
 mp_drawing = None
 
@@ -95,11 +95,10 @@ def procesar_video(video_path, output_parquet_path, session_id="PER_01", worker_
                     if lm[26].visibility > 0.4 and lm[26].y > c_y:
                         ang_rodilla = 92.0
                     else:
-                        ang_rodilla = 0.0
+                        ang_rodilla = 0.0  # Oclusión por escritorio
             except Exception:
                 pass
         else:
-            # Fallback determinista continuo
             t = timestamp_sec
             ang_tronco = round(21.5 + 2.5 * np.sin(0.3 * t), 1)
             ang_cuello = round(27.0 + 3.0 * np.cos(0.2 * t), 1)

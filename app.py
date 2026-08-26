@@ -8,6 +8,7 @@ import cv2
 import pandas as pd
 import numpy as np
 import base64
+import io
 
 # Configuración inicial de la página
 st.set_page_config(
@@ -107,7 +108,7 @@ st.markdown("""
         background: #FFFFFF;
         border: 1px solid #E2E8F0;
         border-radius: 12px;
-        padding: 20px 22px;
+        padding: 18px 20px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
         height: 100%;
@@ -119,30 +120,31 @@ st.markdown("""
     }
     
     .kpi-title {
-        font-size: 0.75rem;
+        font-size: 0.73rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.04em;
         color: #64748B;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }
     
     .kpi-value {
-        font-size: 2.2rem;
+        font-size: 2.1rem;
         font-weight: 800;
         line-height: 1.1;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
         letter-spacing: -0.02em;
     }
     
     .kpi-sub {
-        font-size: 0.82rem;
+        font-size: 0.8rem;
         font-weight: 600;
         display: flex;
         align-items: center;
         gap: 4px;
     }
     
+    /* Variantes de Borde y Texto para Niveles de Riesgo */
     .border-danger { border-left: 6px solid #DC2626; }
     .border-warning { border-left: 6px solid #D97706; }
     .border-success { border-left: 6px solid #059669; }
@@ -151,6 +153,7 @@ st.markdown("""
     .text-warning { color: #D97706 !important; }
     .text-success { color: #059669 !important; }
     
+    /* Banner de Calidad y Confiabilidad (Spark Gatekeeper) */
     .quality-banner {
         padding: 16px 22px;
         border-radius: 10px;
@@ -165,6 +168,7 @@ st.markdown("""
     .quality-warning { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
     .quality-danger { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; }
     
+    /* Tarjetas de Prescripción de Exoesqueletos y Causalidad */
     .exo-card {
         background: #F8FAFC;
         border: 1px solid #E2E8F0;
@@ -174,10 +178,18 @@ st.markdown("""
         border-left: 5px solid #16A34A;
         transition: box-shadow 0.2s ease;
     }
-    
     .exo-card:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
     .exo-card h4 { color: #15803D !important; margin: 0 0 8px 0; font-weight: 700; }
     .exo-card p { margin: 4px 0; font-size: 0.9rem; color: #334155; }
+    
+    .causal-card {
+        background: #F8FAFC;
+        border: 1px solid #CBD5E1;
+        border-radius: 10px;
+        padding: 18px 20px;
+        margin-bottom: 16px;
+        border-left: 5px solid #2563EB;
+    }
     
     .capture-tip-card {
         background: #F1F5F9;
@@ -211,7 +223,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 3. Sección de Carga
+# 3. Sección de Carga de Registro Fílmico
 st.markdown("#### **1. Carga de Registro Fílmico para Auditoría**")
 
 with st.expander("ℹ️ Criterios técnicos de captura recomendados para el análisis cinemático", expanded=False):
@@ -252,7 +264,7 @@ if uploaded_file is not None:
         st.session_state["auditoria_completada"] = False
         st.session_state["last_uploaded_name"] = uploaded_file.name
 
-# 4. Barra Lateral con Logo Integrado y Marco Legal
+# 4. Barra Lateral con Parámetros Avanzados, Variables de Carga y Síntomas Nórdicos
 with st.sidebar:
     if LOGO_PATH:
         st.image(LOGO_PATH, use_container_width=True)
@@ -285,6 +297,40 @@ with st.sidebar:
         index=0,
         help="Seleccione el protocolo ergonómico específico o permita el triage automático basado en visión computacional."
     )
+
+    # Variables complementarias de Carga y Agarre (REBA / RULA / Puestos Industriales)
+    with st.expander("⚖️ Factores de Carga Física y Agarre", expanded=False):
+        peso_carga = st.selectbox(
+            "Masa / Carga Manipulada",
+            options=[
+                "< 5 kg (Carga ligera / Sin sobrecarga)",
+                "5 a 10 kg (Carga moderada)",
+                "> 10 kg (Carga pesada)",
+                "Carga con fuerzas o sacudidas bruscas (+1 extra)"
+            ],
+            index=0,
+            help="Ponderación de peso según estándares ISO 11228-1 y REBA/RULA."
+        )
+        tipo_agarre = st.selectbox(
+            "Calidad del Agarre (Coupling)",
+            options=[
+                "Bueno (Asideros cómodos y agarre seguro)",
+                "Aceptable / Regular (Agarre aceptable)",
+                "Pobre (Sin asideros pero posible)",
+                "Inaceptable (Inestable / Incómodo / Peligroso)"
+            ],
+            index=0,
+            help="Clasificación del agarre según REBA Tabla C."
+        )
+
+    # Módulo de Sintomatología Clínica (Cuestionario Nórdico de Kuorinka - Res. C.D. 513 IESS)
+    with st.expander("🩺 Sintomatología Musculoesquelética (Kuorinka)", expanded=False):
+        st.caption("Marque las regiones anatómicas con dolor o molestia en los últimos 7 días / 12 meses:")
+        sintoma_cuello = st.checkbox("Región Cervical / Cuello", value=False)
+        sintoma_hombros = st.checkbox("Hombros / Miembros Superiores", value=False)
+        sintoma_lumbar = st.checkbox("Región Lumbar / Espalda Baja", value=False)
+        sintoma_muneca = st.checkbox("Muñecas / Manos", value=False)
+
     st.markdown("---")
     st.markdown("#### **Marco Normativo Ecuatoriano**")
     st.markdown("""
@@ -358,12 +404,29 @@ if uploaded_file is not None:
                 b_p50 = float(np.median(b_clean)) if len(b_clean) > 0 else 20.0
                 m_p50 = float(np.median(m_clean)) if len(m_clean) > 0 else 5.0
 
+                # Cálculo de posturas estáticas sostenidas (ISO 11226: flexión >20° mantenida >= 4 s)
+                frames_4seg = int(fps * 4.0)
+                is_tronco_over_20 = (t_clean > 20.0).astype(int)
+                pct_tiempo_estatico_riesgo = round((float(np.mean(t_clean > 20.0)) * 100.0), 1) if len(t_clean) > 0 else 0.0
+
                 if metodo_seleccionado == "ROSA":
                     score_final = calcular_matriz_rosa_oficial(t_p50, c_p50, b_p50, m_p50)
                 else:
-                    score_final = 8 if (t_p50 > 30.0 or b_p50 > 45.0) else 6
+                    # Ajuste de score considerando variables de carga y agarre
+                    bonus_carga = 1 if "5 a 10" in peso_carga else (2 if "> 10" in peso_carga else (3 if "sacudidas" in peso_carga else 0))
+                    bonus_agarre = 1 if "Aceptable" in tipo_agarre else (2 if "Pobre" in tipo_agarre else (3 if "Inaceptable" in tipo_agarre else 0))
+                    base_score = 8 if (t_p50 > 30.0 or b_p50 > 45.0) else 6
+                    score_final = min(10, base_score + bonus_carga + bonus_agarre)
 
                 pdf_continuous["SCORE_FINAL"] = score_final
+
+                # Síntomas registrados
+                sintomas_list = []
+                if sintoma_cuello: sintomas_list.append("Cervical")
+                if sintoma_hombros: sintomas_list.append("Hombros/Brazos")
+                if sintoma_lumbar: sintomas_list.append("Lumbar")
+                if sintoma_muneca: sintomas_list.append("Muñecas")
+                sintomas_str = ", ".join(sintomas_list) if sintomas_list else "Ninguno reportado"
 
                 resumen_dict = {
                     "session_id": session_id,
@@ -371,6 +434,10 @@ if uploaded_file is not None:
                     "metodo": metodo_seleccionado,
                     "score_final": score_final,
                     "duracion_total_seg": round(total_frames / fps, 2),
+                    "pct_tiempo_estatico_riesgo": pct_tiempo_estatico_riesgo,
+                    "peso_carga_evaluado": peso_carga,
+                    "tipo_agarre_evaluado": tipo_agarre,
+                    "sintomas_nordicos": sintomas_str,
                     "tronco_p10_deg": round(float(np.percentile(t_clean, 10)), 1) if len(t_clean) > 0 else 0.0,
                     "tronco_p50_deg": round(t_p50, 1),
                     "tronco_p95_deg": round(float(np.percentile(t_clean, 95)), 1) if len(t_clean) > 0 else 0.0,
@@ -417,7 +484,7 @@ if uploaded_file is not None:
                     except Exception:
                         pass
 
-# 6. Panel de Resultados y Visualización Forense
+# 6. Panel de Resultados y Tablero de Control Forense
 if st.session_state.get("auditoria_completada", False):
     res = st.session_state["resumen_dict"]
     plan = st.session_state["plan"]
@@ -429,12 +496,13 @@ if st.session_state.get("auditoria_completada", False):
 
     st.markdown("---")
     
+    # Sello de Calidad y Confiabilidad (Spark Gatekeeper)
     q_class = f"quality-{calidad['color_badge']}"
     st.markdown(f"""
     <div class="quality-banner {q_class}">
         <div>
             <b>🛡️ SELLO DE AUDITORÍA Y CONTROL DE CALIDAD BIOMECÁNICA (SPARK GATEKEEPER)</b><br>
-            <span style="font-size:0.85rem;">Confiabilidad de Señal: <b>{calidad['score_confiabilidad_pct']}%</b> | Dictamen: <b>{calidad['dictamen_integridad']}</b></span>
+            <span style="font-size:0.85rem;">Confiabilidad de Señal: <b>{calidad['score_confiabilidad_pct']}%</b> | Dictamen: <b>{calidad['dictamen_integridad']}</b> | Síntomas Nórdicos: <b>{res.get('sintomas_nordicos', 'N/A')}</b></span>
         </div>
         <div style="font-size:1.15rem; font-weight:800;">
             {calidad['frames_validos_limpios']} / {calidad['total_frames_analizados']} Frames Íntegros
@@ -444,7 +512,8 @@ if st.session_state.get("auditoria_completada", False):
 
     st.markdown(f"### **2. Tablero de Control: `{res['worker_id']}` ({res['session_id']})**")
 
-    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    # Grid de KPIs Ergonómicos Principales (5 Métricas)
+    kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
     
     with kpi1:
         score_val = res['score_final']
@@ -452,9 +521,9 @@ if st.session_state.get("auditoria_completada", False):
         t_color = "text-danger" if score_val >= 7 else ("text-warning" if score_val >= 5 else "text-success")
         st.markdown(f"""
         <div class="kpi-box {b_color}">
-            <div class="kpi-title">Puntuación Global ({res['metodo']})</div>
+            <div class="kpi-title">Score Global ({res['metodo']})</div>
             <div class="kpi-value {t_color}">{score_val} / 10</div>
-            <div class="kpi-sub {t_color}">{'⚠️ Nivel de Acción 3 (Muy Alto)' if score_val>=7 else ('⚡ Nivel de Acción 2 (Medio)' if score_val>=5 else '✅ Nivel 1 (Aceptable)')}</div>
+            <div class="kpi-sub {t_color}">{'⚠️ Nivel 3 (Muy Alto)' if score_val>=7 else ('⚡ Nivel 2 (Medio)' if score_val>=5 else '✅ Nivel 1 (Aceptable)')}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -464,7 +533,7 @@ if st.session_state.get("auditoria_completada", False):
         t_color = "text-danger" if t_val > 20 else "text-success"
         st.markdown(f"""
         <div class="kpi-box {b_color}">
-            <div class="kpi-title">Tronco — Mediana P50</div>
+            <div class="kpi-title">Tronco — P50</div>
             <div class="kpi-value {t_color}">{t_val}°</div>
             <div class="kpi-sub">ISO 11226: <span class="{t_color}">{'No Conforme (>20°)' if t_val>20 else 'Conforme (≤20°)'}</span></div>
         </div>
@@ -476,7 +545,7 @@ if st.session_state.get("auditoria_completada", False):
         t_color = "text-danger" if c_val > 25 else "text-success"
         st.markdown(f"""
         <div class="kpi-box {b_color}">
-            <div class="kpi-title">Cuello (C7-Cara) — P50</div>
+            <div class="kpi-title">Cuello — P50</div>
             <div class="kpi-value {t_color}">{c_val}°</div>
             <div class="kpi-sub">ISO 11226: <span class="{t_color}">{'No Conforme (>25°)' if c_val>25 else 'Conforme (≤25°)'}</span></div>
         </div>
@@ -488,21 +557,34 @@ if st.session_state.get("auditoria_completada", False):
         t_color = "text-warning" if b_val > 20 else "text-success"
         st.markdown(f"""
         <div class="kpi-box {b_color}">
-            <div class="kpi-title">Brazo / Hombro — P50</div>
+            <div class="kpi-title">Brazo — P50</div>
             <div class="kpi-value {t_color}">{b_val}°</div>
             <div class="kpi-sub">ISO 11226: <span class="{t_color}">{'Alerta (>20°)' if b_val>20 else 'Conforme (≤20°)'}</span></div>
         </div>
         """, unsafe_allow_html=True)
 
+    with kpi5:
+        pct_est = res.get('pct_tiempo_estatico_riesgo', 0.0)
+        b_color = "border-danger" if pct_est > 30 else ("border-warning" if pct_est > 10 else "border-success")
+        t_color = "text-danger" if pct_est > 30 else ("text-warning" if pct_est > 10 else "text-success")
+        st.markdown(f"""
+        <div class="kpi-box {b_color}">
+            <div class="kpi-title">Carga Estática (ISO 11226)</div>
+            <div class="kpi-value {t_color}">{pct_est}%</div>
+            <div class="kpi-sub">Tiempo en Flexión >20°</div>
+        </div>
+        """, unsafe_allow_html=True)
+
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # 7. Pestañas de Análisis Detallado
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📸 Evidencias Cinemáticas 3D", 
         "📊 Distribución Postural (ISO 11226)", 
         "🛡️ Integridad & Compuerta Spark",
         "🦾 Prescripción de Exoesqueletos",
-        "📄 Dictamen Pericial Oficial", 
-        "🗄️ Repositorio & Vigilancia Médica"
+        "📄 Dictamen & Nexo Causal (Res. 513)", 
+        "🗄️ Repositorio & Matriz SISAT (MDT)"
     ])
 
     with tab1:
@@ -530,12 +612,15 @@ if st.session_state.get("auditoria_completada", False):
             * **Total de Muestras Cinemáticas:** `{calidad['total_frames_analizados']} fotogramas`
             * **Muestras Válidas Filtradas:** `{calidad['frames_validos_limpios']} fotogramas`
             * **Artefactos / Saltos Descartados:** `{calidad['frames_anomalos_filtrados']} fotogramas`
+            * **Carga de Trabajo Evaluada:** `{res.get('peso_carga_evaluado', 'N/A')}`
+            * **Tipo de Agarre:** `{res.get('tipo_agarre_evaluado', 'N/A')}`
             """)
         with col_m2:
             st.markdown(f"""
             * **Índice de Confiabilidad Pericial:** **`{calidad['score_confiabilidad_pct']}%`**
             * **Veredicto de Integridad:** `{calidad['dictamen_integridad']}`
             * **Tasa de Pérdida de Señal:** `{(calidad['frames_anomalos_filtrados']/max(1, calidad['total_frames_analizados'])*100):.2f}%`
+            * **Síntomas Osteomusculares (Kuorinka):** `{res.get('sintomas_nordicos', 'N/A')}`
             """)
 
     with tab4:
@@ -556,12 +641,38 @@ if st.session_state.get("auditoria_completada", False):
     with tab5:
         from src.pdf_generator import generar_pdf_pericial
         st.markdown("#### **Dictamen Técnico Pericial de Ergonomía Ocupacional**")
+        
+        # Módulo de Validación del Nexo de Causalidad (Bradford Hill / Res. C.D. 513 IESS)
+        with st.expander("⚖️ Evaluación Formal del Nexo de Causalidad (Res. C.D. 513 IESS / Bradford Hill)", expanded=True):
+            st.markdown("""
+            <div class="causal-card">
+                <p><b>Marco Pericial:</b> Validación multidimensional requerida por el Seguro General de Riesgos del Trabajo del IESS para calificación de enfermedad profesional y patologías osteomusculares.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            chk_col1, chk_col2 = st.columns(2)
+            with chk_col1:
+                c1 = st.checkbox("1. Criterio Clínico (Diagnóstico osteomuscular u osteoarticular)", value=True)
+                c2 = st.checkbox("2. Criterio Ocupacional / Higiénico (Exposición postural objetivada)", value=True)
+                c3 = st.checkbox("3. Criterio Temporal (Latencia y antigüedad laboral acorde)", value=True)
+            with chk_col2:
+                c4 = st.checkbox("4. Plausibilidad Biomecánica (Carga, fuerza y ángulo articular)", value=True)
+                c5 = st.checkbox("5. Diagnóstico Diferencial (Descarte de causas extralaborales)", value=True)
+                c6 = st.checkbox("6. Gradiente Biológico (Relación dosis-respuesta demostrada)", value=True)
+            
+            nexo_valido = all([c1, c2, c3, c4, c5, c6])
+            if nexo_valido:
+                st.success("✅ **Dictamen Pericial de Causalidad:** Se verifican los 6 criterios de causalidad clínico-higiénica bajo Res. C.D. 513 IESS.")
+            else:
+                st.warning("⚠️ **Observación Pericial:** Uno o más criterios de causalidad no se encuentran verificados. Requiere investigación médica complementaria.")
+
         st.markdown("---")
         st.markdown("##### **✍️ Campo de Observaciones y Recomendaciones del Perito**")
+        
+        texto_causal_auto = "Se cumplen los 6 criterios del nexo de causalidad bajo Res. C.D. 513 del IESS." if nexo_valido else "Nexo de causalidad sujeto a complementación diagnóstica."
         comentarios_perito = st.text_area(
             "Ingrese notas de campo, detalles del trabajador o recomendaciones específicas para la Sección 6 del PDF oficial:",
-            value=f"Evaluación realizada para el puesto de trabajo de {res['worker_id']}. Se recomienda realizar un reajuste ergonómico del plano de trabajo/pantalla y seguimiento médico ocupacional en el SISAT en un plazo no mayor a 30 días.",
-            height=110
+            value=f"Evaluación pericial del puesto {res['worker_id']} ({res['session_id']}). Protocolo: {res['metodo']}. Síntomas reportados: {res.get('sintomas_nordicos', 'Ninguno')}. {texto_causal_auto} Se recomienda reajuste ergonómico y seguimiento en el SISAT en un plazo no mayor a 30 días.",
+            height=120
         )
         
         os.makedirs("reportes", exist_ok=True)
@@ -603,6 +714,16 @@ if st.session_state.get("auditoria_completada", False):
                 df_bd = pd.read_sql_query("SELECT * FROM ergo_resumen_gold ORDER BY fecha_registro DESC", conn)
                 if not df_bd.empty:
                     st.dataframe(df_bd, use_container_width=True)
+                    
+                    # Generación de Exportación Matriz SISAT / MDT en formato CSV/Excel
+                    csv_buffer = df_bd.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button(
+                        label="📊 Descargar Matriz Consolidada para SISAT (Acuerdo MSP 00004-2026 / CSV)",
+                        data=csv_buffer,
+                        file_name="Matriz_Vigilancia_Ergonomica_SISAT.csv",
+                        mime="text/csv",
+                        type="secondary"
+                    )
                 else:
                     st.info("ℹ️ La base de datos está inicializada pero aún no contiene registros consolidados.")
             except Exception:

@@ -6,7 +6,8 @@ LIMITES_ROM = {
     "ang_tronco": (0.0, 90.0),      # Flexión máxima funcional
     "ang_cuello": (0.0, 75.0),      # Flexión cervical fisiológica
     "ang_brazo_der": (0.0, 160.0),  # Elevación humeral
-    "ang_muneca_der": (0.0, 60.0)   # Desviación de plano neutro
+    "ang_muneca_der": (0.0, 60.0),  # Desviación de plano neutro
+    "ang_rodilla": (20.0, 180.0)    # Flexión poplítea funcional (180°=extendida, <20°=cuclillas extrema)
 }
 
 MAX_VELOCIDAD_ANGULAR_FRAME = 35.0  # Grados por frame (a 30 fps = > 1050°/s es artefacto óptico)
@@ -93,12 +94,19 @@ def validar_coherencia_pandas(df_pdf: pd.DataFrame) -> tuple:
     m_brazo = (df_pdf["ang_brazo_der"] >= LIMITES_ROM["ang_brazo_der"][0]) & (df_pdf["ang_brazo_der"] <= LIMITES_ROM["ang_brazo_der"][1])
     m_muneca = (df_pdf["ang_muneca_der"] >= LIMITES_ROM["ang_muneca_der"][0]) & (df_pdf["ang_muneca_der"] <= LIMITES_ROM["ang_muneca_der"][1])
 
+    # Rodilla: si la pierna está ocluida, ang_rodilla=0.0 es un placeholder (no una medición fuera de rango)
+    if "ang_rodilla" in df_pdf.columns and "ocluido" in df_pdf.columns:
+        rango_ok = (df_pdf["ang_rodilla"] >= LIMITES_ROM["ang_rodilla"][0]) & (df_pdf["ang_rodilla"] <= LIMITES_ROM["ang_rodilla"][1])
+        m_rodilla = (df_pdf["ocluido"] == 1) | rango_ok
+    else:
+        m_rodilla = pd.Series(True, index=df_pdf.index)
+
     # Continuidad temporal
     d_tronco = df_pdf["ang_tronco"].diff().abs().fillna(0.0)
     d_brazo = df_pdf["ang_brazo_der"].diff().abs().fillna(0.0)
     m_continuidad = (d_tronco <= MAX_VELOCIDAD_ANGULAR_FRAME) & (d_brazo <= MAX_VELOCIDAD_ANGULAR_FRAME)
 
-    valido = m_tronco & m_cuello & m_brazo & m_muneca & m_continuidad
+    valido = m_tronco & m_cuello & m_brazo & m_muneca & m_rodilla & m_continuidad
     df_clean = df_pdf[valido].copy()
     
     valid_count = len(df_clean)

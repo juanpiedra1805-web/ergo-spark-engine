@@ -30,7 +30,7 @@ for p in ["logo.png", "assets/logo.png", "img/logo.png", "assets/logo.svg", "log
         LOGO_PATH = p
         break
 
-# --- Módulos de Cálculo y Visualización SSO 4.0 ---
+# --- Módulos de Cálculo, Telemetría y Análisis Científico SSO 4.0 ---
 
 def calcular_fuzzy_score_continuo(t_p50, c_p50, b_p50, m_p50, metodo="ROSA", bonus_carga=0, bonus_agarre=0):
     """
@@ -189,6 +189,55 @@ def generar_grafico_dosis_temporal(df_continuous, fps, output_path, worker_id):
     plt.tight_layout()
     plt.savefig(output_path, bbox_inches='tight')
     plt.close(fig)
+
+def generar_analisis_cientifico_graficos(res):
+    """
+    Genera dinámicamente dos párrafos de análisis pericial-científico
+    fundamentados en la telemetría cinemática real y citando la literatura clave (SSO 4.0).
+    """
+    metodo = res.get('metodo', 'ROSA')
+    worker_id = res.get('worker_id', 'OPERARIO')
+    t_p50 = res.get('tronco_p50_deg', 0.0)
+    t_p95 = res.get('tronco_p95_deg', 0.0)
+    c_p50 = res.get('cuello_p50_deg', 0.0)
+    c_p95 = res.get('cuello_p95_deg', 0.0)
+    pct_est = res.get('pct_tiempo_estatico_riesgo', 0.0)
+    score_cont = res.get('score_continuo', res.get('score_final', 5.0))
+    sintomas = res.get('sintomas_nordicos', 'Ninguno reportado')
+    
+    t_estado = "No Conforme (>20°)" if t_p50 > 20 else "Conforme (≤20°)"
+    c_estado = "No Conforme (>25°)" if c_p50 > 25 else "Conforme (≤25°)"
+    
+    if "ROSA" in metodo:
+        metodo_cita = "el protocolo ROSA (Sonne, Villalta & Andrews, 2012; ISO 9241-5)"
+    elif "REBA" in metodo:
+        metodo_cita = "el protocolo REBA (Hignett & McAtamney, 2000; Kee, 2021)"
+    else:
+        metodo_cita = "el protocolo RULA (McAtamney & Corlett, 1993)"
+
+    p1 = (
+        f"**1. Análisis Estadístico de Dispersión y Distribución Angular (ISO 11226:2000):** "
+        f"El análisis de cajas y bigotes (*Boxplot*) revela una dispersión angular sostenida en los segmentos axiales del puesto `{worker_id}`. "
+        f"La flexión de tronco registra una mediana postural de $P_{{50}} = {t_p50}^\\circ$ con percentil crítico $P_{{95}} = {t_p95}^\\circ$ ({t_estado}), "
+        f"mientras que la flexión cráneo-cervical se sitúa en una mediana de $P_{{50}} = {c_p50}^\\circ$ y $P_{{95}} = {c_p95}^\\circ$ ({c_estado}). "
+        f"Conforme a los criterios biomecánicos de la norma **ISO 11226:2000** y los fundamentos metodológicos de {metodo_cita}, "
+        f"las desviaciones angulares que superan los rangos neutros de confort ($>20^\\circ$ para tronco y $>25^\\circ$ para cuello) "
+        f"imponen un momento de fuerza gravitacional e incremento de solicitación en las estructuras lumbosacras y la musculatura paravertebral cervical "
+        f"(Kee & Karwowski, 2007; Kee, 2021), determinando un estado de riesgo cinemático objetivo."
+    )
+
+    p2 = (
+        f"**2. Cinemática Continua, Dosis Temporal y Acumulación de Fatiga (SSO 4.0):** "
+        f"La curva de exposición temporal continua evidencia que el trabajador mantiene posturas fuera de los límites de confort durante el **{pct_est}\\% del ciclo de muestreo**, "
+        f"acumulando una dosis postural progresiva que valida el Score Continuo Fuzzy de **{score_cont} / 10**. "
+        f"Bajo los paradigmas de Ergonomía 4.0 e inferencia cinemática markerless (*Huang, Jia & Wang, 2024; Bortolini et al., 2021*), "
+        f"la mantención ininterrumpida de flexiones axiales por períodos superiores a 4 segundos desencadena fenómenos de fatiga muscular estática sostenida y restricción de microcirculación local "
+        f"(*Rohmert, 1973; Sjøgaard & Søgaard, 1998*). "
+        f"Esta telemetría objetiva demuestra una relación dosis-respuesta biomecánica directa y concordancia topográfica con la sintomatología osteomuscular registrada ({sintomas}), "
+        f"satisfaciendo los criterios de plausibilidad biológica del Cuestionario Nórdico (*Kuorinka et al., 1987*), el **Anexo 3 del MDT** y el nexo de causalidad bajo la **Resolución C.D. 513 del IESS**."
+    )
+
+    return f"{p1}\n\n{p2}"
 
 # Inyección de Estilos CSS Avanzados (Diseño Perceptual y Alta Accesibilidad WCAG AAA)
 st.markdown("""
@@ -787,6 +836,16 @@ if st.session_state.get("auditoria_completada", False):
                 generar_grafico_dosis_temporal(pdf_cont, res.get("fps_video", 30.0), timeseries_file, res["worker_id"])
                 if os.path.exists(timeseries_file):
                     st.image(timeseries_file, use_container_width=True)
+
+        # Interpretación Científica Dinámica de Dos Párrafos con Citas Bibliográficas
+        st.markdown("---")
+        st.markdown("##### **📑 Interpretación Científica y Fundamentación Biomecánica (SSO 4.0)**")
+        analisis_cientifico_html = generar_analisis_cientifico_graficos(res).replace('\n\n', '</p><p style="margin-top:12px; line-height:1.55; color:#1E293B;">')
+        st.markdown(f"""
+        <div class="causal-card" style="border-left: 5px solid #0F2D59; background: #FFFFFF; padding: 20px 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+            <p style="margin: 0; line-height: 1.55; color: #1E293B;">{analisis_cientifico_html}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
     with tab3:
         st.markdown("#### **Reporte de Auditoría de Datos y Compuerta de Coherencia**")

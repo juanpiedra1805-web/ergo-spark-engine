@@ -43,10 +43,10 @@ def calcular_angulo_2d(p1, p2, p3):
     return float(np.degrees(np.arccos(np.clip(cos_ang, -1.0, 1.0))))
 
 def computar_angulos_completos_2d(c7, r_ear, nose, r_hip, r_sh, r_elb, r_wri, r_ind, r_knee, r_ank):
-    """Calcula los 5 ángulos posturales principales del puesto de trabajo con alta fidelidad anatómica."""
-    v_vert = np.array([0.0, -1.0])
+    """Calcula los 5 ángulos posturales principales con corrección geométrica para sedestación e inclinación."""
+    v_vert = np.array([0.0, -1.0])  # Vector unitario hacia arriba (gravedad invertida)
     
-    # 1. Tronco: Vector real de Cadera a C7 respecto a la vertical
+    # 1. Tronco: Vector de Cadera a C7
     v_torso = np.array(c7) - np.array(r_hip)
     n_torso = np.linalg.norm(v_torso)
     if n_torso > 0:
@@ -55,7 +55,16 @@ def computar_angulos_completos_2d(c7, r_ear, nose, r_hip, r_sh, r_elb, r_wri, r_
     else:
         ang_tronco = 0.0
         
-    # 2. Cuello: Vector real de C7 a Oreja (Cervical-Cefálico) respecto a la vertical
+    # Corrección trigonométrica complementaria por desplazamiento horizontal para tronco en sedestación inclinada
+    delta_x = c7[0] - r_hip[0]
+    if abs(delta_x) > 5.0 and ang_tronco < 5.0:
+        desplazamiento_horiz = abs(c7[0] - r_hip[0])
+        longitud_torso = max(1.0, n_torso)
+        ang_calc = float(np.degrees(np.arcsin(np.clip(desplazamiento_horiz / longitud_torso, 0.0, 1.0))))
+        if ang_calc > ang_tronco:
+            ang_tronco = ang_calc
+
+    # 2. Cuello: Vector de C7 a la Oreja (Cervical-Cefálico) respecto a la vertical
     v_cuello = np.array(r_ear) - np.array(c7)
     n_cuello = np.linalg.norm(v_cuello)
     if n_cuello > 0:
@@ -140,7 +149,6 @@ def procesar_video(video_path: str, output_parquet_path: str = None, session_id:
                 r_wri = np.array([lm[mp_pose.PoseLandmark.RIGHT_WRIST].x * w, lm[mp_pose.PoseLandmark.RIGHT_WRIST].y * h])
                 r_ind = np.array([lm[mp_pose.PoseLandmark.RIGHT_INDEX].x * w, lm[mp_pose.PoseLandmark.RIGHT_INDEX].y * h])
                 
-                # Asignación directa de la cadera real detectada (sin sesgos artificiales de verticalidad)
                 raw_hip = np.array([lm[mp_pose.PoseLandmark.RIGHT_HIP].x * w, lm[mp_pose.PoseLandmark.RIGHT_HIP].y * h])
                 r_hip = raw_hip
                 

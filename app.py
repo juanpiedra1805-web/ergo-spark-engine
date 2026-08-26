@@ -77,6 +77,13 @@ st.markdown("""
     .quality-success { background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; }
     .quality-warning { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
     .quality-danger { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; }
+    .exo-card {
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -360,7 +367,6 @@ if st.session_state.get("auditoria_completada", False):
             height=110
         )
         
-        # Generar PDF en tiempo real con las observaciones del perito
         os.makedirs("reportes", exist_ok=True)
         pdf_filename = f"reportes/Dictamen_{res['session_id']}_{res['worker_id']}.pdf"
         generar_pdf_pericial(res, plan, img_dir, pdf_filename, observaciones_usuario=comentarios_perito)
@@ -390,10 +396,21 @@ if st.session_state.get("auditoria_completada", False):
         st.markdown("---")
         st.markdown("### Vista Previa del Informe Pericial")
         st.markdown(inf_md)
+
     with tab6:
         st.markdown("#### **Base de Datos Consolidada de Vigilancia Epidemiológica (SQLite)**")
-        if os.path.exists("data/ergo_database.db"):
-            conn = sqlite3.connect("data/ergo_database.db")
-            df_bd = pd.read_sql_query("SELECT * FROM ergo_resumen_gold ORDER BY fecha_registro DESC", conn)
-            st.dataframe(df_bd, use_container_width=True)
-            conn.close()
+        db_path = "data/ergo_database.db"
+        if os.path.exists(db_path):
+            conn = sqlite3.connect(db_path)
+            try:
+                df_bd = pd.read_sql_query("SELECT * FROM ergo_resumen_gold ORDER BY fecha_registro DESC", conn)
+                if not df_bd.empty:
+                    st.dataframe(df_bd, use_container_width=True)
+                else:
+                    st.info("ℹ️ La base de datos está inicializada pero aún no contiene registros consolidados.")
+            except Exception:
+                st.info("ℹ️ Aún no se han consolidado registros en la tabla histórica. Procesa una evaluación para generar la primera entrada.")
+            finally:
+                conn.close()
+        else:
+            st.info("ℹ️ Repositorio local SQLite pendiente de inicialización tras la primera auditoría.")

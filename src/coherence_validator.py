@@ -128,7 +128,15 @@ def validar_coherencia_pandas(df_pdf: pd.DataFrame) -> tuple:
         "frames_anomalos_filtrados": total - valid_count,
         "score_confiabilidad_pct": score_pct,
         "dictamen_integridad": dictamen,
-        "color_badge": badge
+        "color_badge": badge,
+        "diagnostico_compuertas_pct": {
+            "rango_tronco": round(float(m_tronco.mean()) * 100.0, 1),
+            "rango_cuello": round(float(m_cuello.mean()) * 100.0, 1),
+            "rango_brazo": round(float(m_brazo.mean()) * 100.0, 1),
+            "rango_muneca": round(float(m_muneca.mean()) * 100.0, 1),
+            "rango_rodilla": round(float(m_rodilla.mean()) * 100.0, 1),
+            "continuidad_temporal": round(float(m_continuidad.mean()) * 100.0, 1),
+        }
     }
 
     return (df_clean if valid_count > 10 else df_pdf), metricas_calidad

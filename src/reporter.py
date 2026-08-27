@@ -6,21 +6,30 @@ Generador de Dictámenes Técnicos y Planificador de Evidencias bajo D.E. 255, A
 def planificar_evidencias(candidatos, metodo_seleccionado, score_final):
     """
     Selecciona y planifica las 4 fases de evidencia biomecánica a partir de los frames candidatos,
-    garantizando compatibilidad total con las claves 'frame_idx' y 'frame'.
+    manejando tanto listas de diccionarios como listas de enteros de forma 100% robusta.
     """
-    n_cands = len(candidatos) if candidatos else 0
+    def extraer_frame_num(item, default_val=0):
+        if isinstance(item, dict):
+            return int(item.get("frame_idx", item.get("frame", item.get("frame_id", default_val))))
+        try:
+            return int(item)
+        except (ValueError, TypeError):
+            return default_val
+
+    parsed_cands = [extraer_frame_num(c) for c in candidatos] if candidatos else []
+    n_cands = len(parsed_cands)
+
     if n_cands == 0:
         indices = [15, 45, 75, 120]
     elif n_cands >= 4:
-        # Distribuir temporalmente en 4 momentos del video para evitar fotos repetidas
         indices = [
-            int(candidatos[max(0, int(n_cands * 0.15))]),
-            int(candidatos[min(n_cands - 1, int(n_cands * 0.45))]),
-            int(candidatos[min(n_cands - 1, int(n_cands * 0.75))]),
-            int(candidatos[min(n_cands - 1, int(n_cands * 0.90))])
+            parsed_cands[max(0, int(n_cands * 0.15))],
+            parsed_cands[min(n_cands - 1, int(n_cands * 0.45))],
+            parsed_cands[min(n_cands - 1, int(n_cands * 0.75))],
+            parsed_cands[min(n_cands - 1, int(n_cands * 0.90))]
         ]
     else:
-        indices = [int(x) for x in list(candidatos)] + [int(candidatos[-1])] * (4 - n_cands)
+        indices = parsed_cands + [parsed_cands[-1]] * (4 - n_cands)
 
     fases = [
         {

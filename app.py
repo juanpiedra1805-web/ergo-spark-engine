@@ -1168,6 +1168,13 @@ if st.session_state.get("auditoria_completada", False):
             * **Confiabilidad Pericial:** **`{calidad['score_confiabilidad_pct']}%`** ({calidad['dictamen_integridad']})
             * **Estado Miembros Inferiores:** `{'No Evaluable (Oclusión por Escritorio)' if res.get('miembros_inf_ocluido') else res.get('miembros_inf_estado', 'Conforme')}`
             """)
+            diag_compuertas = calidad.get('diagnostico_compuertas_pct')
+            if diag_compuertas and calidad.get('score_confiabilidad_pct', 100.0) < 90.0:
+                st.markdown("##### **🔍 Diagnóstico por Compuerta (qué filtro está rechazando frames):**")
+                st.markdown(f"""
+                * Rango Tronco: `{diag_compuertas['rango_tronco']}%` | Rango Cuello: `{diag_compuertas['rango_cuello']}%` | Rango Brazo: `{diag_compuertas['rango_brazo']}%`
+                * Rango Muñeca: `{diag_compuertas['rango_muneca']}%` | Rango Rodilla: `{diag_compuertas['rango_rodilla']}%` | Continuidad Temporal: `{diag_compuertas['continuidad_temporal']}%`
+                """)
 
     with tab4:
         st.markdown("#### **Prescripción Técnica de Exoesqueletos Ocupacionales**")

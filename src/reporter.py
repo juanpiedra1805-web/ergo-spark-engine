@@ -1,7 +1,35 @@
 """
 Módulo de Reportes Forenses de Ergonomía - IH&T Services
-Generador de Dictámenes Técnicos bajo D.E. 255, Anexo 3 MDT y Acuerdo MSP 00004-2026 (SISAT).
+Generador de Dictámenes Técnicos y Planificador de Evidencias bajo D.E. 255, Anexo 3 MDT y Acuerdo MSP 00004-2026 (SISAT).
 """
+
+def planificar_evidencias(candidatos, metodo_seleccionado, score_final):
+    """
+    Selecciona y planifica las 4 fases de evidencia biomecánica a partir de los frames candidatos,
+    garantizando que no se repita el mismo frame si hay suficientes muestras.
+    """
+    n_cands = len(candidatos) if candidatos else 0
+    if n_cands == 0:
+        indices = [15, 45, 75, 120]
+    elif n_cands >= 4:
+        # Distribuir temporalmente en 4 momentos del video para evitar fotos repetidas
+        indices = [
+            candidatos[max(0, int(n_cands * 0.15))],
+            candidatos[min(n_cands - 1, int(n_cands * 0.45))],
+            candidatos[min(n_cands - 1, int(n_cands * 0.75))],
+            candidatos[min(n_cands - 1, int(n_cands * 0.90))]
+        ]
+    else:
+        indices = list(candidatos) + [candidatos[-1]] * (4 - n_cands)
+
+    fases = [
+        {"fase_id": 1, "fase_nombre": "Fase 1: Interacción con Periféricos y Alcance de Trabajo", "frame": indices[0], "filename": "evidencia_fase_1.jpg"},
+        {"fase_id": 2, "fase_nombre": "Fase 2: Flexión Cráneo-Cervical hacia Pantalla", "frame": indices, "filename": "evidencia_fase_2.jpg"},
+        {"fase_id": 3, "fase_nombre": "Fase 3: Pico de Máxima Solicitación Articular", "frame": indices[2], "filename": "evidencia_fase_3.jpg"},
+        {"fase_id": 4, "fase_nombre": "Fase 4: Régimen Postural Continuo Habitual (P50)", "frame": indices[3], "filename": "evidencia_fase_4.jpg"}
+    ]
+    return fases
+
 
 def generar_dictamen_ergonomico(resumen_dict, plan, metodo_seleccionado, img_rel_dir):
     """
@@ -29,7 +57,6 @@ def generar_dictamen_ergonomico(resumen_dict, plan, metodo_seleccionado, img_rel
     b_p50 = resumen_dict.get('brazo_p50_deg', 0.0)
     b_p95 = resumen_dict.get('brazo_p95_deg', 0.0)
     
-    # Manejo defensivo ultra-robusto para miembros inferiores / rodilla
     inf_ocluido = resumen_dict.get('inf_ocluido', resumen_dict.get('miembros_inf_ocluido', False))
     r_p50_raw = resumen_dict.get('rodilla_p50_deg', resumen_dict.get('pierna_p50_deg', resumen_dict.get('miembros_inf_p50', None)))
     
